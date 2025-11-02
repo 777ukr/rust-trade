@@ -1,0 +1,412 @@
+# Cursor Rules for Crypto Trader Project
+
+## Project Context
+This is a Rust-based cryptocurrency trading application using:
+- Tokio for async runtime
+- reqwest for HTTP requests
+- serde/serde_json for serialization
+- chrono for time handling
+- anyhow/thiserror for error handling
+
+## Code Style & Best Practices
+
+### Rust Conventions
+- Follow Rust 2021 edition conventions
+- Use `snake_case` for variables, functions, and modules
+- Use `PascalCase` for types and traits
+- Prefer explicit error handling with `Result<T, E>` and `?` operator
+- Use `anyhow::Result` for application-level errors, `thiserror::Error` for library-level errors
+- Document public APIs with `///` doc comments
+- Use expressive variable names that convey intent (e.g., `is_ready`, `has_data`, `has_position`)
+- Avoid code duplication; use functions and modules to encapsulate reusable logic
+
+### File Size & Modularity (CRITICAL)
+- **Target file size**: 300-500 lines (ideal), 800 lines (acceptable), 1200 lines (maximum)
+- **When a file exceeds 800 lines**: Break it into smaller modules following single-responsibility principle
+- **Refactoring strategy for large files**:
+  - Extract related functionality into separate modules
+  - Group by responsibility: parsing, business logic, state management
+  - Create helper modules (e.g., `helpers.rs`, `types.rs`, `traits.rs`)
+  - Use `mod.rs` for module organization when appropriate
+- **Examples of good splits**:
+  - `parser.rs` → `parser/mod.rs` + `parser/parse_orderbook.rs` + `parser/parse_trades.rs`
+  - `strategy.rs` → `strategy/mod.rs` + `strategy/signals.rs` + `strategy/position.rs`
+  - `engine.rs` → Split into `engine/mod.rs`, `engine/state.rs`, `engine/handlers.rs`
+
+### Code Organization & Structure
+- Keep modules focused and single-responsibility
+- Use `mod.rs` or inline module definitions appropriately
+- Group related functionality (api, models, strategy, indicators, screener, parser, utils)
+- Separate concerns: networking, business logic, data structures
+- Structure into clear module hierarchy:
+  ```
+  src/
+  ├── module/
+  │   ├── mod.rs           # Public exports
+  │   ├── types.rs         # Types and structs
+  │   ├── handlers.rs      # Main logic
+  │   └── helpers.rs       # Helper functions
+  ```
+
+### Async Programming Patterns
+- Use `tokio` as the async runtime
+- Implement async functions using `async fn` syntax
+- Leverage `tokio::spawn` for concurrent tasks
+- Use `tokio::select!` for managing multiple async tasks and cancellations
+- Favor structured concurrency: prefer scoped tasks and clean cancellation paths
+- Implement timeouts, retries, and backoff strategies for robust async operations
+- Use `tokio::time::sleep` and `tokio::time::interval` for efficient time-based operations
+- Avoid blocking operations inside async functions; offload to dedicated blocking threads if necessary
+- Use `tokio::task::yield_now` to yield control in cooperative multitasking scenarios
+
+### Channels and Concurrency
+- Use `tokio::sync::mpsc` for asynchronous, multi-producer, single-consumer channels
+- Use `tokio::sync::broadcast` for broadcasting messages to multiple consumers
+- Implement `tokio::sync::oneshot` for one-time communication between tasks
+- Prefer bounded channels for backpressure; handle capacity limits gracefully
+- Use `tokio::sync::Mutex` and `tokio::sync::RwLock` for shared state across tasks
+- **Avoid**: `std::sync::Mutex` inside async tasks (use `tokio::sync::Mutex` instead)
+- Minimize lock duration; prefer message passing over shared state when possible
+
+### Error Handling and Safety
+- Embrace Rust's `Result` and `Option` types for error handling
+- Use `?` operator to propagate errors in async functions
+- Implement custom error types using `thiserror` or `anyhow` for more descriptive errors
+- Use `anyhow::Context` for adding context to errors: `.context("message")`
+- Use `thiserror::Error` derive macro for structured error types
+- Handle errors and edge cases early, returning errors where appropriate
+- Use `.await` responsibly, ensuring safe points for context switching
+- Log errors appropriately before returning or propagating
+
+### API & Networking
+- Use `reqwest` for HTTP requests with proper error handling
+- Handle rate limits and retries appropriately
+- Parse JSON responses safely with serde
+- Use appropriate HTTP methods and headers
+- Implement connection retry logic with exponential backoff
+
+### Testing & Validation
+- Write unit tests in `tests/` directory or inline with `#[cfg(test)]`
+- Use `tokio::test` for async tests
+- Use `tokio::time::pause` for testing time-dependent code without real delays
+- Use `mockito` for mocking HTTP responses in integration tests
+- Test error cases and edge conditions
+- Implement integration tests to validate async behavior and concurrency
+- **API Validation Tests**: Test credentials, balances, trade history before trading
+- **Backtest Validation**: Validate strategy performance on historical data
+- **Strategy Variants**: Test multiple strategy variants (trailing, early exit, extended target)
+- **Performance Metrics**: Track win rate, Sharpe ratio, max drawdown, total P&L
+
+### Performance Optimization
+- Minimize async overhead; use sync code where async is not needed
+- Avoid unnecessary allocations in hot paths
+- Use `&str` over `String` when possible
+- Consider using references to avoid cloning large data structures
+- Profile before optimizing
+- Optimize data structures and algorithms for async use, reducing contention
+- Avoid heavy operations in critical paths (e.g., serde_json parsing, SystemTime::now in hot loops)
+
+### Security
+- Never hardcode API keys or secrets
+- Use environment variables or config files for sensitive data
+- Validate and sanitize all external inputs
+- Handle financial calculations with appropriate precision
+- Implement strict access controls where applicable
+
+## Project-Specific Guidelines
+
+### Module Structure
+- Follow the existing module structure (api, models, strategy, indicators, screener, parser, utils, exchanges, execution)
+- Each exchange integration in `src/exchanges/{exchange}/`
+- Execution logic in `src/execution/`
+- Keep configuration in `config/` directory
+- Store data files in `data/` directory (which is gitignored)
+
+### Incremental Development & Git Workflow
+- **Make small, incremental changes** that can be committed frequently
+- **Each commit should represent a working state** - code should compile and pass tests
+- **Break large features into smaller commits**:
+  - First: Add module structure and types
+  - Second: Implement core logic
+  - Third: Add error handling
+  - Fourth: Add tests
+  - Fifth: Integration and refinement
+- **Commit message format**: Use clear, descriptive messages:
+  ```
+  feat: add RSI indicator calculation
+  refactor: split engine.rs into smaller modules
+  fix: correct stop-loss position tracking
+  ```
+- **Before refactoring large files**: Create a commit with current state, then refactor
+- **Document significant changes** in commit messages or PR descriptions
+
+### Refactoring Large Files
+When encountering files > 800 lines:
+1. **Analyze dependencies**: Identify what can be extracted
+2. **Extract types first**: Move structs/enums to `types.rs`
+3. **Extract helpers**: Move utility functions to `helpers.rs`
+4. **Split by responsibility**: Group related functions into separate modules
+5. **Update tests**: Ensure tests still work after refactoring
+6. **Commit incrementally**: One module at a time
+
+### Code Review Checklist
+- [ ] File size under 1200 lines (preferably under 800)
+- [ ] Clear module boundaries and responsibilities
+- [ ] Async code uses `tokio::sync::Mutex` not `std::sync::Mutex`
+- [ ] Error handling with proper context
+- [ ] No blocking operations in async functions
+- [ ] Tests for new functionality
+- [ ] Documentation for public APIs
+
+## When Making Changes
+
+### Before Making Changes
+- Review existing code patterns before making changes
+- Check file sizes - if target file > 800 lines, consider refactoring first
+- Identify similar functionality that can be reused
+- Plan incremental changes that can be committed separately
+
+### During Development
+- Write clear, concise, and idiomatic Rust code
+- Keep functions focused on single responsibility
+- Extract complex logic into helper functions
+- Use descriptive names that convey intent
+- Add inline comments for complex logic
+
+### After Making Changes
+- Ensure code compiles and tests pass
+- Update tests when changing functionality
+- Document significant changes or new features
+- Maintain backward compatibility when possible
+- Consider if file size needs refactoring
+- Commit in logical chunks
+
+## Incremental Feature Development
+
+When adding new features:
+1. **Planning Phase**: Identify required modules and dependencies
+2. **Foundation**: Create types and data structures (commit)
+3. **Core Logic**: Implement main functionality in small chunks (multiple commits)
+4. **Integration**: Wire up with existing systems (commit)
+5. **Testing**: Add unit and integration tests (commit)
+6. **Refinement**: Optimize and document (commit)
+
+### Example: Adding New Indicator
+1. `feat: add MACD indicator types` - Add struct and trait definitions
+2. `feat: implement MACD calculation logic` - Core calculation in separate file
+3. `feat: integrate MACD into strategy` - Connect to existing strategy
+4. `test: add MACD unit tests` - Test calculations
+5. `docs: document MACD indicator usage` - Update documentation
+
+## Key Principles Summary
+
+1. **Modularity**: Keep files small (300-500 lines ideal, 800 max recommended, 1200 hard limit)
+2. **Single Responsibility**: Each module/file should do one thing well
+3. **Incremental Development**: Small, frequent commits with working code
+4. **Async Best Practices**: Use tokio primitives, avoid blocking in async
+5. **Error Handling**: Proper error propagation with context
+6. **Performance**: Profile before optimizing, avoid allocations in hot paths
+7. **Security**: Never hardcode secrets, validate inputs
+8. **Testing**: Test as you develop, not after
+
+## Reducing Compilation Errors - Best Practices
+
+### Modular Project Organization
+- **Break code into small modules** - Each module should compile independently
+- This reduces dependency chains and "error avalanches"
+- Clear module boundaries: `mod.rs` for public interface, separate files for implementation
+- Example structure:
+  ```
+  src/
+  ├── module/
+  │   ├── mod.rs           # Public exports only
+  │   ├── types.rs         # Types and structs
+  │   ├── handlers.rs      # Main logic
+  │   └── helpers.rs       # Helper functions
+  ```
+
+### Frequent Compilation Checks
+- **Use `cargo check` frequently** - Checks code without building binaries
+- Fix errors incrementally, don't wait for final build
+- Run `cargo check` after each logical change:
+  ```bash
+  cargo check --features gate_exec
+  ```
+- This catches errors early and prevents "error snowball effect"
+
+### Conscious Type Usage and Cloning
+- **If object is moved but needed again - clone it explicitly**
+- Rust cannot "guess" what you want - be explicit:
+  ```rust
+  // ❌ Bad - use after move
+  self.position = Some(pos);
+  self.entry_price = Some(pos.entry_price); // Error!
+  
+  // ✅ Good - extract values first
+  let entry = pos.entry_price;
+  self.position = Some(pos);
+  self.entry_price = Some(entry);
+  
+  // ✅ Good - clone if needed multiple times
+  let metrics = calculate_metrics(&trades);
+  let cloned = metrics.clone();
+  // Use metrics here, cloned later
+  ```
+- Add `#[derive(Clone)]` to structs that need cloning:
+  ```rust
+  #[derive(Debug, Clone)]
+  pub struct PerformanceMetrics { ... }
+  ```
+
+### Feature Flags and Conditional Compilation
+- **Use `#[cfg(feature = "...")]` for optional modules**
+- Always compile with correct features:
+  ```bash
+  cargo check --features gate_exec
+  cargo build --features gate_exec
+  ```
+- Document required features in module docs
+- Use feature gates consistently:
+  ```rust
+  #![cfg(feature = "gate_exec")]
+  // or
+  #[cfg(feature = "gate_exec")]
+  pub mod execution;
+  ```
+
+### Consistent Naming Conventions
+- **Follow Rust conventions strictly:**
+  - `snake_case` for functions, variables, modules
+  - `PascalCase` for types, traits, structs, enums
+  - `SCREAMING_SNAKE_CASE` for constants
+  - `'short` for lifetimes
+- Clear separation of interface (`mod.rs`) and implementation
+- Use meaningful names that convey intent
+
+### Error Prevention Checklist
+1. ✅ Run `cargo check` after each logical change
+2. ✅ Check for move errors before using `clone()`
+3. ✅ Verify all imports use correct module paths (`rust_test::` for binaries)
+4. ✅ Ensure feature flags are set correctly
+5. ✅ Remove unused imports and variables
+6. ✅ Fix warnings - Rust is strict about these
+7. ✅ Test compilation frequently, not just at the end
+
+### Debugging Compilation Errors
+- Read error messages carefully - Rust has excellent error messages
+- Use `rustc --explain E0382` for detailed error explanations
+- Check for common patterns:
+  - E0382: use after move → clone or restructure
+  - E0255: duplicate names → remove or rename
+  - E0433: unresolved import → check module path
+  - E0425: function not found → check imports/scope
+
+## Project Integrations
+
+### Gate.io Integration (rust-trade)
+- **Location**: `rust-trade/trading-core/src/exchange/gateio.rs`
+- **Status**: ✅ Complete integration with WebSocket and REST API
+- **Usage**: Use `GateioExchange` instead of `BinanceExchange` - implements same `Exchange` trait
+- **Features**:
+  - Real-time WebSocket trades subscription
+  - Historical trades via REST API
+  - Automatic reconnection and error handling
+  - Format conversion: Gate.io → TickData
+- **Documentation**: See `rust-trade/GATEIO_INTEGRATION.md` and `rust-trade/QUICK_START.md`
+- **Symbol format**: Accepts `BTCUSDT` (converts internally to `BTC_USDT` for Gate.io)
+
+### Available Backtesting Projects
+1. **rust-trade** (`rust-trade/`): Desktop app with Tauri + Next.js, PostgreSQL, Redis caching
+   - Gate.io integration added
+   - Visual backtesting interface
+   - Real-time data collection
+
+2. **barter-rs** (`barter-rs-main/`): High-performance algorithmic trading ecosystem (2k+ stars)
+   - Modular architecture: Barter, Barter-Data, Barter-Execution, Barter-Integration
+   - Fast backtesting with indexed data structures
+   - Strategy and RiskManager components
+   - Paper trading with live market data
+
+### Choosing Backtesting Framework
+- **rust-trade**: Best for visual interface, database-backed, full stack application
+- **barter-rs**: Best for high-performance, modular, extensive strategy library
+
+## PostgreSQL Database Integration
+
+### Current Status
+- **Feature Flag**: `database` (requires `gate_exec`)
+- **Location**: `src/database/`
+- **Status**: 🚧 In Progress - Integration started, compilation fixes needed
+
+### Module Structure
+```
+src/database/
+├── mod.rs          # Public exports
+├── types.rs        # Database types (TickData, OHLCVData, BacktestResult, StrategyLog, etc.)
+└── repository.rs   # DatabaseRepository - CRUD operations
+```
+
+### Schema
+- **Location**: `database/schema.sql`
+- **Tables**:
+  - `tick_data` - Real-time trade data (timestamp, symbol, price, quantity, side, etc.)
+  - `ohlcv_data` - Candlestick data (timestamp, symbol, interval, open/high/low/close/volume)
+  - `backtest_results` - Strategy backtest results (P&L, ROI, win rate, profit factor, etc.)
+  - `strategy_logs` - Detailed execution logs per strategy
+  - `account_history` - Account balance snapshots
+
+### Dependencies
+- `sqlx = "0.7"` with features: `["runtime-tokio-native-tls", "postgres", "chrono", "rust_decimal", "uuid"]`
+- `rust_decimal = "1.32"` with features: `["serde-with-str", "db-postgres"]`
+- `chrono = "0.4"` with feature: `["serde"]`
+- `thiserror = "1"` (optional, for RepositoryError)
+
+### Usage
+1. **Setup Database**:
+   ```bash
+   # See docs/DATABASE_SETUP.md for detailed instructions
+   createdb cryptotrader
+   psql cryptotrader < database/schema.sql
+   ```
+
+2. **Set Environment Variable**:
+   ```bash
+   export DATABASE_URL="postgresql://user:password@localhost:5432/cryptotrader"
+   ```
+
+3. **Use in Code**:
+   ```rust
+   #[cfg(feature = "database")]
+   use rust_test::database::{DatabaseRepository, BacktestResult};
+   
+   let pool = DatabaseRepository::create_pool(&database_url).await?;
+   let repo = DatabaseRepository::new(pool);
+   repo.insert_backtest_result(&result).await?;
+   ```
+
+### Integration Points
+- **investor_demo.rs**: Automatically saves backtest results to PostgreSQL if `DATABASE_URL` is set
+- **Repository Pattern**: All database operations go through `DatabaseRepository`
+- **Type Safety**: Uses `rust_decimal::Decimal` for financial calculations (avoids floating-point errors)
+- **Query Helpers**: Query structs (`TickQuery`, `OHLCVQuery`, `BacktestQuery`) for flexible filtering
+
+### Known Issues & Solutions
+1. **sqlx rust_decimal support**: Requires `rust_decimal` feature `db-postgres` and `sqlx` feature `rust_decimal`
+2. **FromRow for complex tuples**: Use intermediate structs with `#[derive(FromRow)]` instead of large tuples
+3. **thiserror dependency**: Must be added to `Cargo.toml` for `RepositoryError`
+4. **Feature flags**: Always compile with `--features gate_exec,database` when using database functionality
+
+### Next Steps
+- [ ] Fix compilation errors in `repository.rs` (FromRow, thiserror imports)
+- [ ] Add migration support (sqlx migrate)
+- [ ] Implement connection pooling configuration
+- [ ] Add transaction support for batch operations
+- [ ] Create database health check endpoint
+
+## References
+- Rust Async Book: https://rust-lang.github.io/async-book/
+- Tokio Documentation: https://tokio.rs/
+- Rust API Guidelines: https://rust-lang.github.io/api-guidelines/
+- Rust Error Index: https://doc.rust-lang.org/error_codes/
+- Barter-rs: https://github.com/barter-rs/barter-rs
+- Rust-trade: See `rust-trade/README.md`

@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"name": "crypto_trader",
+			"path": "/home/crypto/sites/cryptotrader.com"
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/node_modules": true,
+			"**/dist": true,
+			"**/.git": true,
+			"**/target": true,
+			"**/Cargo.lock": false
+		},
+		"rust-analyzer.checkOnSave": {
+			"command": "clippy"
+		}
+	}
+}

@@ -1,0 +1,103 @@
+{
+    "task": "Full Technical & Architectural Review",
+    "context": "You have built a multi-module application based on instructions including Monitoring, Feature Flags, Performance Optimization, Audit Trail, Access Control, and Design System.",
+    "goal": "Perform a 1000% thorough QA and architecture audit for each module and overall structure, as a senior software architect.",
+    "actions": [
+        {
+            "title": "Stage Summary",
+            "description": "Summarize current development stage.",
+            "check": [
+                "What module/stage are you currently working on?",
+                "What has been implemented in this stage?",
+                "What is left or blocked?"
+            ]
+        },
+        {
+            "title": "Change Log Verification",
+            "description": "Show the dev-journal or changelog entries related to this module.",
+            "check": [
+                "File paths of changed files",
+                "Date of change and brief summary",
+                "Reason for change (feature, fix, refactor)"
+            ]
+        },
+        {
+            "title": "Checkpoint Validation",
+            "description": "Verify all control points (checkpoints) were completed.",
+            "check": [
+                "Compare implemented features with defined checkpoints",
+                "Mark completed/unfinished",
+                "Explain why anything is skipped or delayed"
+            ]
+        },
+        {
+            "title": "File Overview",
+            "description": "List all files created/modified in the current module.",
+            "check": [
+                "File path",
+                "Purpose of file",
+                "Dependencies and connections"
+            ]
+        },
+        {
+            "title": "Code Audit",
+            "description": "Conduct a manual code review like a senior engineer.",
+            "check": [
+                "Detect any anti-patterns or tech debt",
+                "Mark areas with TODO, FIXME, or quick hacks",
+                "Suggest refactors if needed",
+                "Ensure modular, testable, scalable code"
+            ]
+        },
+        {
+            "title": "Security Review",
+            "description": "Perform a security analysis of this module.",
+            "check": [
+                "Authentication/authorization implemented properly?",
+                "Sensitive data exposed in logs, errors, or URLs?",
+                "Are tokens, sessions, API keys handled securely?"
+            ]
+        },
+        {
+            "title": "Testing & Coverage",
+            "description": "Show and evaluate written tests.",
+            "check": [
+                "Which test files are present?",
+                "Which components/services are covered?",
+                "Do the tests include edge cases and fail conditions?",
+                "What’s the expected test coverage percentage?"
+            ]
+        },
+        {
+            "title": "Production Readiness",
+            "description": "Assess if the module is ready for deployment.",
+            "check": [
+                "Are errors properly handled and logged?",
+                "Is performance acceptable (latency, load)?",
+                "Is the module integrated with CI/CD?",
+                "Is it isolated and fail-safe?"
+            ]
+        },
+        {
+            "title": "Documentation & Dev UX",
+            "description": "Check if developer-facing documentation is complete.",
+            "check": [
+                "README updated for this module?",
+                "Usage examples and interface documentation?",
+                "Storybook (if UI), OpenAPI (if API), or other tools updated?"
+            ]
+        },
+        {
+            "title": "Summary Report",
+            "description": "Generate a clean summary of the full review.",
+            "check": [
+                "What passed?",
+                "What needs attention?",
+                "What is blocked?",
+                "What is recommended next?"
+            ]
+        }
+    ],
+    "output_format": "Markdown or collapsible sections preferred",
+    "reviewer_role": "Act as a Lead Architect + QA Lead"
+}
