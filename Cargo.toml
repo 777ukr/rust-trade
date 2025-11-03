@@ -154,7 +154,7 @@ optional = true
 [dependencies.axum]
 version = "0.7"
 optional = true
-features = ["macros", "json"]
+features = ["macros", "json", "ws"]
 
 [dependencies.sqlx]
 version = "0.7"

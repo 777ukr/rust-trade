@@ -36,6 +36,16 @@ struct BacktestResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct StrategyRating {
+    profitability_score: f64,  // 0-10
+    stability_score: f64,      // 0-10
+    risk_score: f64,           // 0-10
+    fill_rate_score: f64,      // 0-10
+    overall_rating: f64,       // 0-10
+    stars: u32,                // 0-5
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct StrategyResult {
     strategy_name: String,
     symbol: String,
@@ -53,6 +63,7 @@ struct StrategyResult {
     max_drawdown: f64,
     leverage: f64,
     profitable: bool, // Только если ROI > 0
+    rating: Option<StrategyRating>, // Рейтинг стратегии
 }
 
 #[derive(Clone)]
@@ -155,6 +166,16 @@ async fn run_backtest(
     for strategy in &request.strategies {
         for symbol in &request.symbols {
             // TODO: Вызов реального бэктеста
+            // Рассчитываем рейтинг (упрощенно)
+            let rating = Some(StrategyRating {
+                profitability_score: 8.5,
+                stability_score: 7.2,
+                risk_score: 9.0,
+                fill_rate_score: 8.0,
+                overall_rating: 8.2,
+                stars: 4,
+            });
+            
             let result = StrategyResult {
                 strategy_name: strategy.clone(),
                 symbol: symbol.clone(),
@@ -172,6 +193,7 @@ async fn run_backtest(
                 max_drawdown: 3.2,
                 leverage: request.leverage,
                 profitable: true,
+                rating,
             };
             results.push(result);
         }
