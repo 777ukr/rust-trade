@@ -42,6 +42,7 @@ dashboard = [
     "dep:jsonwebtoken",
     "dep:bcrypt",
     "dep:argon2",
+    "dep:futures-util",
 ]
 database = [
     "gate_exec",
