@@ -302,8 +302,9 @@ async fn run_backtest(
 
     // Запускаем фоновую задачу
     let state_clone = state.clone();
+    let backtest_id_clone = backtest_id.clone();
     tokio::spawn(async move {
-        run_backtest_task(state_clone, backtest_id.clone(), request, tx).await;
+        run_backtest_task(state_clone, backtest_id_clone, request, tx).await;
     });
 
     Ok(Json(BacktestResponse {
@@ -383,10 +384,11 @@ async fn run_backtest_task(
                             );
                             
                             // Отправляем прогресс о завершении
-                            let _ = progress_tx.send(ProgressMessage::Complete {
+                            let complete_msg = ProgressMessage::Complete {
                                 backtest_id: backtest_id.clone(),
                                 result: result.clone(),
-                            });
+                            };
+                            let _ = progress_tx.send(complete_msg);
                             
                             // Сохраняем в БД если доступно
                             if let Some(ref repo) = state.db_repo {
@@ -466,8 +468,8 @@ async fn load_trade_data(symbol: &str) -> anyhow::Result<Vec<TradeStream>> {
                 let trade_ticks: Vec<TradeTick> = ticks.into_iter().map(|t| TradeTick {
                     timestamp: t.timestamp,
                     symbol: t.symbol,
-                    price: t.price.to_f64().unwrap_or(0.0),
-                    volume: t.quantity.to_f64().unwrap_or(0.0),
+                    price: f64::try_from(t.price).unwrap_or(0.0),
+                    volume: f64::try_from(t.quantity).unwrap_or(0.0),
                     side: if t.side == "BUY" { TradeSide::Buy } else { TradeSide::Sell },
                     trade_id: t.trade_id,
                     best_bid: None,
@@ -574,14 +576,14 @@ fn convert_to_db_result(
         final_balance: Decimal::try_from(result.final_balance).unwrap_or_default(),
         total_pnl: Decimal::try_from(result.total_pnl).unwrap_or_default(),
         total_fees: Decimal::try_from(result.total_fees).unwrap_or_default(),
-        total_trades: result.trades,
-        winning_trades: result.wins,
-        losing_trades: result.losses,
+        total_trades: result.trades as i32,
+        winning_trades: result.wins as i32,
+        losing_trades: result.losses as i32,
         win_rate: Decimal::try_from(result.win_rate).unwrap_or_default(),
         roi: Decimal::try_from(result.roi).unwrap_or_default(),
-        profit_factor: Decimal::try_from(result.profit_factor).unwrap_or_default(),
-        max_drawdown: Decimal::try_from(result.max_drawdown).unwrap_or_default(),
-        sharpe_ratio: Decimal::try_from(backtest_result.sharpe_ratio).unwrap_or_default(),
+        profit_factor: Some(Decimal::try_from(result.profit_factor).unwrap_or_default()),
+        max_drawdown: Some(Decimal::try_from(result.max_drawdown).unwrap_or_default()),
+        sharpe_ratio: Some(Decimal::try_from(backtest_result.sharpe_ratio).unwrap_or_default()),
         start_time: Some(Utc::now() - Duration::days(180)),
         end_time: Some(Utc::now()),
         config: None,
@@ -598,7 +600,7 @@ async fn stream_backtest_progress(
 }
 
 async fn handle_websocket(socket: WebSocket, state: AppState, backtest_id: String) {
-    use futures::{SinkExt, StreamExt};
+    use futures_util::{SinkExt, StreamExt};
     let (mut sender, mut _receiver) = socket.split();
     let mut rx = {
         let jobs = state.jobs.lock().await;
