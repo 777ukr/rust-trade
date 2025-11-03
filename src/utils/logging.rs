@@ -64,6 +64,8 @@ pub fn enable_module_logging(module: &str, level: &str) {
     } else {
         format!("{},{}={}", current, module, level)
     };
-    env::set_var("RUST_LOG", new);
+    unsafe {
+        env::set_var("RUST_LOG", new);
+    }
 }
 

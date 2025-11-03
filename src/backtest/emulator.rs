@@ -120,7 +120,7 @@ impl MarketEmulator {
                         };
                         
                         // Исполняем ордер (полностью или частично)
-                        let _remaining = order.size - order.filled;
+                        let remaining = order.size - order.filled;
                         let fill_size = remaining.min(tick.volume * 0.1); // Примерно 10% объема тика
                         
                         order.filled += fill_size;
