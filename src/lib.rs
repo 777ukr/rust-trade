@@ -37,3 +37,4 @@ pub mod saas;
 // Backtest module (requires gate_exec)
 #[cfg(feature = "gate_exec")]
 pub mod backtest;
+pub mod risk;
