@@ -145,8 +145,12 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    println!("🚀 Investor Portal запущен!");
-    println!("📊 Откройте в браузере: http://localhost:8080");
+    // Инициализация логирования
+    #[cfg(feature = "gate_exec")]
+    rust_test::utils::logging::init_logging();
+    
+    log::info!("🚀 Investor Portal запущен!");
+    log::info!("📊 Откройте в браузере: http://localhost:8080");
 
     #[cfg(feature = "database")]
     let db_repo = if let Ok(database_url) = std::env::var("DATABASE_URL") {

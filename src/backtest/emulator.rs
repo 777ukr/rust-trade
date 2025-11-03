@@ -120,7 +120,7 @@ impl MarketEmulator {
                         };
                         
                         // Исполняем ордер (полностью или частично)
-                        let remaining = order.size - order.filled;
+                        let _remaining = order.size - order.filled;
                         let fill_size = remaining.min(tick.volume * 0.1); // Примерно 10% объема тика
                         
                         order.filled += fill_size;
@@ -166,7 +166,7 @@ impl MarketEmulator {
         if let Some(order) = self.active_orders.get_mut(&order_id) {
             if order.filled < order.size {
                 // Исполняем оставшуюся часть
-                let remaining = order.size - order.filled;
+                let _remaining = order.size - order.filled;
                 order.filled = order.size;
                 order.filled_at = Some(_timestamp);
                 

@@ -32,6 +32,8 @@ gate_exec = [
     "dep:dotenvy",
     "dep:rand",
     "dep:chrono",
+    "dep:env_logger",
+    "dep:log",
 ]
 dashboard = [
     "gate_exec",
@@ -129,6 +131,10 @@ optional = true
 [dependencies.anyhow]
 version = "1"
 
+[dependencies.log]
+version = "0.4"
+optional = true
+
 [dependencies.thiserror]
 version = "1"
 optional = true
@@ -189,6 +195,10 @@ optional = true
 version = "0.8"
 optional = true
 
+[dependencies.env_logger]
+version = "0.11"
+optional = true
+
 [[bin]]
 name = "gate_cancel_text"
 path = "src/bin/gate_cancel_text.rs"
@@ -232,3 +242,8 @@ required-features = ["dashboard"]
 name = "investor_portal"
 path = "src/bin/investor_portal.rs"
 required-features = ["dashboard"]
+
+[[bin]]
+name = "load_historical_data"
+path = "src/bin/load_historical_data.rs"
+required-features = ["database", "gate_exec"]

@@ -98,7 +98,7 @@ impl MarketSelector {
         &self,
         symbol: &str,
         market_data: &MarketDataSnapshot,
-        current_time: DateTime<Utc>,
+        _current_time: DateTime<Utc>,
     ) -> bool {
         // Черный список
         if self.filters.black_list.contains(&symbol.to_string()) {

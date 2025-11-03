@@ -6,3 +6,6 @@ pub mod parsing;
 
 #[cfg(feature = "gate_exec")]
 pub mod gate_commission;
+
+#[cfg(feature = "gate_exec")]
+pub mod logging;
