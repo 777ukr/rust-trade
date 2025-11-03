@@ -30,6 +30,8 @@ gate_exec = [
     "dep:futures-util",
     "dep:tokio-tungstenite",
     "dep:dotenvy",
+    "dep:rand",
+    "dep:chrono",
 ]
 dashboard = [
     "gate_exec",
@@ -37,6 +39,9 @@ dashboard = [
     "dep:tokio",
     "dep:serde",
     "dep:serde_json",
+    "dep:jsonwebtoken",
+    "dep:bcrypt",
+    "dep:argon2",
 ]
 database = [
     "gate_exec",
@@ -167,6 +172,22 @@ version = "1.32"
 optional = true
 features = ["serde-with-str", "db-postgres"]
 
+[dependencies.jsonwebtoken]
+version = "9"
+optional = true
+
+[dependencies.bcrypt]
+version = "0.15"
+optional = true
+
+[dependencies.argon2]
+version = "0.5"
+optional = true
+
+[dependencies.rand]
+version = "0.8"
+optional = true
+
 [[bin]]
 name = "gate_cancel_text"
 path = "src/bin/gate_cancel_text.rs"
@@ -204,4 +225,9 @@ required-features = ["gate_exec"]
 [[bin]]
 name = "investor_dashboard"
 path = "src/bin/investor_dashboard.rs"
+required-features = ["dashboard"]
+
+[[bin]]
+name = "investor_portal"
+path = "src/bin/investor_portal.rs"
 required-features = ["dashboard"]

@@ -403,6 +403,107 @@ src/database/
 - [ ] Add transaction support for batch operations
 - [ ] Create database health check endpoint
 
+## HFT Backtest Engine Implementation
+
+### Core Features (✅ Completed)
+- **Tick-by-Tick Simulation**: Каждый тик обрабатывается отдельно с миллисекундной точностью
+- **Full Order Book (L2/L3)**: Полная реконструкция стакана с очередями исполнения
+  - Поддержка скрытых ордеров и айсбергов
+  - FIFO/ProRata/TimePriority модели исполнения
+- **Latency Modeling**: Случайные задержки сети (10-20 мс) для реалистичного моделирования
+- **Order Fill Simulation**: Учет позиции в очереди, частичное исполнение
+- **Monte Carlo**: Многократные прогоны для статистики стабильности
+- **.bin Format**: Совместимость с MoonBot форматом данных
+
+### Market Filters (✅ Completed)
+- Дельта фильтры: 1м, 3м, 5м, 15м, 30м, 1ч, 24ч окна
+- Объемные фильтры: 24ч объем, ликвидность, волатильность
+- Фильтр ставки финансирования
+- Фильтры шага цены и марк прайса
+- Топ-N рынков по критерию (Volume24h, Delta1h, Volatility, Liquidity)
+
+### Strategy Rating System (✅ Completed)
+- **Profitability Score** (0-10): Комбинация P&L, profit factor, win rate
+- **Stability Score** (0-10): Sharpe ratio
+- **Risk Score** (0-10): Обратный max drawdown
+- **Fill Rate Score** (0-10): Процент исполненных ордеров
+- **Overall Rating** (0-10): Средневзвешенное (35% profit, 25% stability, 25% risk, 15% fill rate)
+- **Stars** (0-5): Автоматическое присвоение на основе overall rating
+
+### Module Structure
+```
+src/backtest/
+├── engine.rs       # Основной движок бэктеста
+├── orderbook.rs    # L2/L3 стакан с очередями
+├── emulator.rs     # Эмулятор рынка
+├── market.rs       # TradeTick, TradeStream
+├── filters.rs      # Фильтры и селекторы
+├── metrics.rs      # Метрики и рейтинг
+├── replay.rs       # Replay движок
+└── bin_format.rs   # Чтение/запись .bin файлов
+```
+
+## MoonBot Strategies Implementation
+
+### Status
+- ✅ **MShot**: Базовая реализация с параметрами (MShotPrice, MShotPriceMin, дельты, повторы)
+- 🚧 **MStrike**: Структура готова, нужна полная реализация LastBidEMA
+- 🚧 **Hook**: Структура готова, нужна реализация динамического коридора
+- 🚧 **Spread**: Структура готова, нужна реализация активных зон
+- 🚧 **EMA Filter**: Структура готова, нужна реализация CustomEMA формул
+- 🚧 **Triggers**: Система триггеров для активации стратегий
+- 🚧 **Sessions**: Управление сессиями с профитом/убытком
+
+### Strategy Location
+Все MoonBot стратегии находятся в `src/strategy/moon_strategies/`
+
+## API Endpoints Status
+
+### ✅ Implemented
+- `GET /` - Главная страница
+- `GET /api/strategies` - Список стратегий
+- `GET /api/leverages` - Список плеч
+- `GET /api/symbols` - Список символов
+- `POST /api/backtest` - Запуск бэктеста
+- `GET /api/results` - Результаты бэктестов
+
+### 📋 Planned (see docs/API_ENDPOINTS.md)
+- Auth endpoints (register, login, me)
+- CRUD для стратегий
+- Управление API ключами
+- Заявки клиентов
+- Live торговля
+- WebSocket для стриминга
+
+## Testing Checklist
+
+### Before Committing
+- [ ] `cargo check --features gate_exec` - без ошибок
+- [ ] `cargo test` - все тесты проходят
+- [ ] File size < 1200 lines (желательно < 800)
+- [ ] No unused imports/variables (fix warnings)
+- [ ] Documentation для public APIs
+
+### Integration Tests
+- [ ] Backtest engine работает с реальными данными
+- [ ] OrderBook правильно симулирует исполнение
+- [ ] Метрики корректно рассчитываются
+- [ ] Рейтинг стратегий работает
+
+## Performance Targets
+
+- **Backtest Speed**: > 100,000 тиков/сек
+- **OrderBook Updates**: < 1мс на тик
+- **Memory Usage**: < 2GB для 1M тиков
+- **API Response Time**: < 100мс для большинства endpoints
+
+## Documentation Files
+
+- `docs/HFT_BACKTEST_SPEC.md` - Полная спецификация HFT бэктестера
+- `docs/API_ENDPOINTS.md` - Документация по API
+- `docs/CHECKLIST.md` - Чеклист разработки
+- `IMPLEMENTATION_SUMMARY.md` - Итоги реализации
+
 ## References
 - Rust Async Book: https://rust-lang.github.io/async-book/
 - Tokio Documentation: https://tokio.rs/
@@ -410,3 +511,4 @@ src/database/
 - Rust Error Index: https://doc.rust-lang.org/error_codes/
 - Barter-rs: https://github.com/barter-rs/barter-rs
 - Rust-trade: See `rust-trade/README.md`
+- MoonBot Documentation: See strategy specs in code comments

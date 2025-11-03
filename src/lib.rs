@@ -25,3 +25,15 @@ pub mod models;
 // Database (requires PostgreSQL feature)
 #[cfg(feature = "database")]
 pub mod database;
+
+// Auth module (requires dashboard feature)
+#[cfg(all(feature = "dashboard", feature = "database"))]
+pub mod auth;
+
+// SaaS module (requires dashboard and database)
+#[cfg(all(feature = "dashboard", feature = "database"))]
+pub mod saas;
+
+// Backtest module (requires gate_exec)
+#[cfg(feature = "gate_exec")]
+pub mod backtest;
