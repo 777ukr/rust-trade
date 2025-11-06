@@ -513,6 +513,294 @@ src/backtest/
 - `docs/CHECKLIST.md` - Чеклист разработки
 - `IMPLEMENTATION_SUMMARY.md` - Итоги реализации
 
+## Strategy Rating System (Strat Ninja Style)
+
+### Overview
+Create a comprehensive strategy rating and ranking system similar to https://strat.ninja/ with:
+- Multiple tabs (Latest, Failed, Private, DCA, Multiclass, Ranking)
+- Detailed metrics and filtering
+- Modern UI/UX with dark/light theme
+- Real-time updates and auto-refresh
+- Strategy details modal/page with visualizations
+
+### Implementation Plan (Step-by-Step)
+
+#### Step 1: Data Structure & Backend API
+**Location**: `freqtrade/rating_api_server.py` (FastAPI backend)
+
+**Tasks**:
+- Extend existing API endpoints to support tabs:
+  - `/api/rankings/latest` - Latest backtests
+  - `/api/rankings/failed` - Failed backtests with reasons
+  - `/api/rankings/private` - Private strategies (no URL)
+  - `/api/rankings/dca` - DCA-enabled strategies
+  - `/api/rankings/multiclass` - Multiclass strategies
+  - `/api/rankings/main` - Main ranking (default, filtered)
+- Add query parameters:
+  - `exchange` (binance, kucoin, gateio)
+  - `stake` (USDT, BUSD, BTC)
+  - `hide_negative` (boolean)
+  - `show_dca` (boolean)
+  - `show_multiclass` (boolean)
+  - `sort_by` (ninja_score, avg_prof, tot_profit, win_rate, sharpe)
+  - `order` (asc, desc)
+- Return data structure:
+```json
+{
+  "data": [
+    {
+      "strategy_name": "ElliotV5_SMA",
+      "avg_buys": 27,
+      "avg_prof": 0.58,
+      "avg_tot_profit_pct": 2.73,
+      "avg_win_pct": 75.67,
+      "avg_dd_pct": 4.47,
+      "timeframe": "5m",
+      "stoploss": -0.189,
+      "avg_sharpe": 1.91,
+      "ninja_score": 62,
+      "exchange": "gateio",
+      "stake": "USDT",
+      "flags": {
+        "lookahead": false,
+        "private": false,
+        "futures": false,
+        "tight_trailing": false,
+        "dca": false,
+        "multiclass": false
+      },
+      "backtests": [
+        {
+          "month": "202507",
+          "buys": 32,
+          "avg_prof": 1.56,
+          "tot_profit_pct": 11.5,
+          "win_pct": 84.4,
+          "dd_pct": 6.89,
+          "sharpe": 5.31
+        }
+      ]
+    }
+  ],
+  "total": 152,
+  "filtered": 7
+}
+```
+
+#### Step 2: Frontend - Tabs & Table Structure
+**Location**: `freqtrade/user_data/web/rating_ui.html`
+
+**Tasks**:
+- Create tab navigation:
+  ```html
+  <div class="tabs">
+    <button class="tab active" data-tab="ranking">Ranking</button>
+    <button class="tab" data-tab="latest">Latest</button>
+    <button class="tab" data-tab="failed">Failed</button>
+    <button class="tab" data-tab="private">Private</button>
+    <button class="tab" data-tab="dca">DCA</button>
+    <button class="tab" data-tab="multiclass">Multiclass</button>
+  </div>
+  ```
+- Table columns (exact match to strat.ninja):
+  - Strategy (clickable, opens details)
+  - avg Buys
+  - avg Prof%
+  - avg Tot Profit%
+  - avg Win%
+  - avg DD%
+  - TF (timeframe)
+  - Stoploss
+  - avg Sharpe
+  - Ninja Score (with percentage bar)
+- Add flags column with icons:
+  - L = Lookahead bias
+  - P = Private / No URL
+  - F = Futures
+  - T = Tight Trailing Stop
+  - D = DCA enabled
+  - M = Multiclass
+- Implement sorting (clickable headers)
+- Add pagination (Show 12/25/50/100 rows)
+
+#### Step 3: Filters & Search Panel
+**Tasks**:
+- Exchange filter (dropdown): All Exchanges, Binance, Kucoin, Gate.io
+- Instrument filter (radio/tabs): [Spot] USDT / BUSD / BTC
+- Futures toggle: [Futures] USDT
+- Checkboxes:
+  - ☐ Hide Negative
+  - ☐ Hide Private
+  - ☐ Show Multiclass
+  - ☐ Show DCA
+- Search input: Filter by strategy name
+- Apply/Reset buttons
+
+#### Step 4: Auto-Update & Real-time
+**Tasks**:
+- Auto-refresh every 30-60 seconds
+- Show loading indicators during updates
+- Smooth transitions (fade in/out)
+- WebSocket support (optional, for live updates)
+- Notification system for new backtests
+
+#### Step 5: Strategy Details Modal/Page
+**Tasks**:
+- Click on strategy name → open modal or navigate to detail page
+- Show detailed information:
+  - Strategy name, hash (SHA256)
+  - Indicators list (with importance/impact)
+  - Backtests breakdown by month (table)
+  - Equity curve chart (Plotly.js or Chart.js)
+  - Recursive Analysis results
+  - Comments section
+  - Similar strategies (based on indicators)
+- Charts:
+  - Equity curve (cumulative profit over time)
+  - Monthly performance bar chart
+  - Win/Loss distribution
+  - Drawdown visualization
+
+#### Step 6: Stats Dashboard
+**Tasks**:
+- Create stats section (updated hourly):
+  - Total Strategies: XXXX
+  - Github Strategies: XXXX
+  - Uploaded Strategies: XXXX
+  - Total Backtests: (XXXXX)
+  - Quantstats Generated: (XXXX)
+  - Failed Testing: XX% (XXXX)
+  - Duplicate: XX% (XXXX)
+  - Lookahead: XX% (XXXX)
+  - Tight Trailing: XX% (XXXX)
+  - Biased Strategies: XX% (XXXX)
+  - Stalled: XX% (XXXX)
+  - Private: XX% (XXXX)
+  - DCA: XX% (XXXX)
+  - Multiclass: XX% (XXXX)
+  - Backtest/Month: XX% (XXXX)
+- Backtesting progress by exchange:
+  - Binance Spot: XX% (X)
+  - Kucoin Spot: XX% (X)
+  - Binance Futures: XX% (X)
+- Latest Backtests list
+- Latest Failed Backtests list
+- Latest Uploads list
+
+#### Step 7: UI/UX Enhancements
+**Tasks**:
+- Dark/Light theme toggle (save preference in localStorage)
+- Modern design:
+  - Smooth animations
+  - Hover effects
+  - Loading skeletons
+  - Toast notifications
+  - Responsive layout (mobile-friendly)
+- Color coding:
+  - Green for positive metrics
+  - Red for negative metrics
+  - Yellow/Orange for warnings
+  - Gray for neutral/disabled
+- Progress indicators:
+  - Ninja Score as percentage bar
+  - Win rate as progress bar
+  - Drawdown as negative progress bar
+
+#### Step 8: Data Processing & Metrics
+**Location**: `freqtrade/strategy_rating_system_standalone.py`
+
+**Tasks**:
+- Calculate monthly breakdown from backtest results
+- Group backtests by month
+- Calculate averages (avg Buys, avg Prof, etc.)
+- Calculate Ninja Score using weighted formula:
+  ```
+  ninja_score = (
+    buys * 9 +
+    avg_prof * 26 +
+    tot_prof_pct * 26 +
+    win_pct * 24 +
+    dd_pct * -25 +
+    stoploss * 7 +
+    sharpe * 7 +
+    sortino * 7 +
+    calmar * 7 +
+    expectancy * 8 +
+    profit_factor * 9 +
+    cagr * 10 +
+    rejected_signals * -25 +
+    backtest_win_pct * 10
+  )
+  ```
+- Detect flags:
+  - Lookahead bias (via analysis)
+  - Private (no download URL)
+  - Futures (can_short = True)
+  - Tight Trailing Stop (trailing_stop_positive <= 0.0025)
+  - DCA (position_adjustment_enable = True)
+  - Multiclass (multiple classes in file)
+
+#### Step 9: API Endpoints Implementation
+**Tasks**:
+```python
+@app.get("/api/rankings/{tab}")
+async def get_rankings_tab(
+    tab: str,  # latest, failed, private, dca, multiclass, main
+    exchange: Optional[str] = None,
+    stake: Optional[str] = None,
+    hide_negative: bool = False,
+    show_dca: bool = False,
+    show_multiclass: bool = False,
+    sort_by: str = "ninja_score",
+    order: str = "desc",
+    page: int = 1,
+    per_page: int = 12
+):
+    """Get rankings for specific tab with filters"""
+    # Implementation here
+```
+
+#### Step 10: Testing & Optimization
+**Tasks**:
+- Test with 1000+ strategies
+- Optimize API queries (indexing, caching)
+- Test all filters combinations
+- Test pagination
+- Test sorting on all columns
+- Performance: < 100ms API response, smooth UI updates
+- Mobile responsiveness testing
+
+### Code Style for Rating System
+- Use consistent naming: `avg_buys`, `avg_prof`, `tot_profit_pct`, `win_pct`, `dd_pct`
+- Store all backtests per strategy (not just medians) for monthly breakdown
+- Use TypeScript-like type hints in Python for clarity
+- Implement proper error handling and fallbacks
+- Use async/await for all API calls
+- Cache API responses where appropriate (client-side)
+- Use localStorage for user preferences (theme, filters, pagination)
+
+### File Organization
+```
+freqtrade/
+├── rating_api_server.py          # Main API server
+├── strategy_rating_system_standalone.py  # Data processing
+├── rating_web_interface_standalone.py   # HTML generator (legacy)
+└── user_data/
+    └── web/
+        ├── rating_ui.html        # Main UI (modern, with tabs)
+        ├── strategy_detail.html  # Strategy detail page (optional)
+        └── assets/
+            ├── style.css         # Styles (dark/light theme)
+            └── app.js            # JavaScript logic
+```
+
+### References
+- Strat Ninja: https://strat.ninja/
+- Freqtrade Backtesting: https://www.freqtrade.io/en/stable/backtesting/
+- Plotly.js: https://plotly.com/javascript/
+- Material UI: https://mui.com/
+- Ant Design: https://ant.design/
+
 ## References
 - Rust Async Book: https://rust-lang.github.io/async-book/
 - Tokio Documentation: https://tokio.rs/
