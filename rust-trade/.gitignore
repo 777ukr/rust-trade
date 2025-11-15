@@ -50,3 +50,26 @@ config/*.toml.local
 *.key
 *.pem
 
+# Large backup files
+*.tar.gz
+*.zip
+*backup*.tar.gz
+*backup*.zip
+
+# Embedded git repositories (submodules)
+freqtrade/
+jesse-test/
+nautilus_trader/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Build artifacts that shouldn't be committed
+target/
+*.d
+*.fingerprint
+
