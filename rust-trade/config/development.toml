@@ -1,11 +1,14 @@
-# Trading pairs to monitor
-symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
+# Trading pairs to monitor - только ETH для низкочастотной стратегии
+symbols = ["ETHUSDT"]
 
 [server]
 host = "0.0.0.0"
 port = 8080
 
 [database]
+# URL базы данных (можно переопределить через переменную окружения DATABASE_URL)
+# Используется пользователь cryptotrader (найден в системе)
+url = "postgresql://cryptotrader:cryptotrader@localhost/trading_core"
 max_connections = 5
 min_connections = 1
 max_lifetime = 1800
@@ -22,5 +25,14 @@ max_ticks_per_symbol = 10000
 
 [paper_trading]
 enabled = true
-strategy = "rsi"    
-initial_capital = 10000.0   
+# Низкочастотная стратегия: покупка на просадке 0.2%, продажа на 0.6% или стоп-лосс 0.22%
+strategy = "dip_buy"
+initial_capital = 10000.0
+
+[exchange]
+# Exchange provider: "binance" or "gateio"
+provider = "gateio"
+# API ключи Gate.io (для будущего использования в реальной торговле)
+# Пока используются только для чтения данных через WebSocket
+api_key = "d42fb9e346be8d3d9b5102803de3b5f2"
+api_secret = "e106f78d027a6bac04f093e7d629c26855cde4c6a4d32742a96efa1f5ca0b2f2"

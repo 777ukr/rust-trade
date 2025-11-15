@@ -1,11 +1,15 @@
 use rust_decimal::Decimal;
 use sqlx::PgPool;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tower_http::cors::{CorsLayer, Any};
 
+mod api;
 mod backtest;
 mod config;
 mod data;
@@ -15,7 +19,7 @@ mod service;
 
 use config::Settings;
 use data::{cache::TieredCache, repository::TickDataRepository};
-use exchange::BinanceExchange;
+use exchange::create_exchange;
 use live_trading::PaperTradingProcessor;
 use service::MarketDataService;
 
@@ -35,6 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 run_live_mode().await
             }
         }
+        Some("api") | Some("server") => run_api_server().await,
         None => run_live_mode().await,
         Some("--help") | Some("-h") => {
             print_usage();
@@ -53,10 +58,61 @@ fn print_usage() {
     println!();
     println!("Usage:");
     println!("  cargo run                # Run live data collection");
-    println!("  cargo run live           # Run live data collection");
-    println!("  cargo run backtest       # Run backtesting mode");
-    println!("  cargo run --help         # Show this help message");
+    println!("  cargo run live            # Run live data collection");
+    println!("  cargo run backtest        # Run backtesting mode");
+    println!("  cargo run api             # Run HTTP API server (for web interface)");
+    println!("  cargo run --help          # Show this help message");
     println!();
+}
+
+/// HTTP API Server mode
+async fn run_api_server() -> Result<(), Box<dyn std::error::Error>> {
+    init_application().await?;
+
+    info!("🌐 Starting Trading Core HTTP API Server");
+
+    let settings = Settings::new()?;
+    info!("📋 Configuration loaded successfully");
+
+    // Create database connection pool
+    info!("🔌 Connecting to database...");
+    let pool = create_database_pool(&settings).await?;
+    test_database_connection(&pool).await?;
+    info!("✅ Database connection established");
+
+    // Create cache
+    info!("💾 Initializing cache...");
+    let cache = create_cache(&settings).await?;
+    info!("✅ Cache initialized");
+
+    // Create repository
+    let repository = Arc::new(TickDataRepository::new(pool, cache));
+
+    // Create API router
+    let app = api::create_router(repository)
+        .layer(CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any));
+
+    // Start server
+    let addr = format!("{}:{}", settings.server.host, settings.server.port);
+    info!("🚀 Starting HTTP API server on http://{}", addr);
+    
+    let listener = tokio::net::TcpListener::bind(&addr).await
+        .map_err(|e| format!("Failed to bind to {}: {}", addr, e))?;
+    
+    info!("✅ HTTP API server listening on http://{}", addr);
+    info!("📡 Available endpoints:");
+    info!("   GET /api/strategies - List available strategies");
+    info!("   GET /api/data/info - Get database information");
+    info!("   GET /api/backtest/validate?symbol=ETHUSDT&data_count=10000 - Validate backtest config");
+
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| format!("Server error: {}", e))?;
+
+    Ok(())
 }
 
 async fn run_live_with_paper_trading() -> Result<(), Box<dyn std::error::Error>> {
@@ -98,10 +154,19 @@ async fn run_live_with_paper_trading() -> Result<(), Box<dyn std::error::Error>>
     );
 
     // Verify strategy exists
-    if crate::backtest::strategy::get_strategy_info(&settings.paper_trading.strategy).is_none() {
-        error!("❌ Unknown strategy: {}", settings.paper_trading.strategy);
-        error!("💡 Available strategies: rsi, sma");
-        std::process::exit(1);
+    let strategy_id = &settings.paper_trading.strategy;
+    match crate::backtest::strategy::create_strategy(strategy_id) {
+        Ok(_) => {
+            info!("✅ Strategy '{}' verified", strategy_id);
+        }
+        Err(e) => {
+            error!("❌ Invalid strategy '{}': {}", strategy_id, e);
+            error!("Available strategies:");
+            for s in crate::backtest::strategy::list_strategies() {
+                error!("  - {} ({})", s.id, s.name);
+            }
+            std::process::exit(1);
+        }
     }
 
     // Create database connection pool
@@ -118,56 +183,33 @@ async fn run_live_with_paper_trading() -> Result<(), Box<dyn std::error::Error>>
     // Create repository
     let repository = Arc::new(TickDataRepository::new(pool, cache));
 
-    // Create exchange connection
+    // Create exchange
     info!("📡 Initializing exchange connection...");
-    let exchange = Arc::new(BinanceExchange::new());
+    info!("🔌 Exchange provider: {}", settings.exchange.provider);
+    let exchange = create_exchange(&settings.exchange.provider)
+        .map_err(|e| format!("Failed to create exchange: {}", e))?;
     info!("✅ Exchange connection ready");
 
-    // Create strategy
-    info!(
-        "🧠 Initializing strategy: {}",
-        settings.paper_trading.strategy
-    );
-    let strategy = crate::backtest::strategy::create_strategy(&settings.paper_trading.strategy)?;
-    info!("✅ Strategy initialized: {}", strategy.name());
-
+    // Create strategy for paper trading
+    let strategy = crate::backtest::strategy::create_strategy(strategy_id)
+        .map_err(|e| format!("Failed to create strategy: {}", e))?;
+    
     // Create paper trading processor
-    let initial_capital = Decimal::try_from(settings.paper_trading.initial_capital)
-        .map_err(|e| format!("Invalid initial capital: {}", e))?;
-    let paper_trading = Arc::new(tokio::sync::Mutex::new(PaperTradingProcessor::new(
+    let paper_trading = PaperTradingProcessor::new(
         strategy,
-        Arc::clone(&repository),
-        initial_capital,
-    )));
-
-    // Create market data service
-    let service = MarketDataService::new(exchange, repository, settings.symbols.clone())
-        .with_paper_trading(paper_trading);
-
-    info!(
-        "🎯 Starting market data collection with paper trading for {} symbols",
-        settings.symbols.len()
+        repository.clone(),
+        Decimal::from_str(&settings.paper_trading.initial_capital.to_string())
+            .unwrap_or(Decimal::from(10000)),
     );
-    println!("🚀 Paper trading is now active! Watch for trading signals below...");
-    println!(
-        "📈 Strategy: {} | Initial Capital: ${}",
-        settings.paper_trading.strategy, settings.paper_trading.initial_capital
-    );
-    println!("{}", "=".repeat(80));
 
-    // Start service
-    run_live_application_with_service(service).await?;
+    // Create market data service with paper trading callback
+    let service = MarketDataService::new(exchange, repository.clone(), settings.symbols.clone())
+        .with_paper_trading(Arc::new(Mutex::new(paper_trading)));
 
-    info!("✅ Application stopped gracefully");
-    Ok(())
-}
+    info!("🎯 Starting paper trading for {} symbols", settings.symbols.len());
 
-async fn run_live_application_with_service(
-    service: MarketDataService,
-) -> Result<(), Box<dyn std::error::Error>> {
+    // Setup signal forwarding to service
     let service_shutdown_tx = service.get_shutdown_tx();
-
-    // Start signal forwarding task
     tokio::spawn(async move {
         signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
         println!("\nReceived Ctrl+C signal, forwarding to service...");
@@ -175,29 +217,72 @@ async fn run_live_application_with_service(
         let _ = service_shutdown_tx.send(());
     });
 
-    // Just wait for service to complete
+    // Start service and wait for completion
     match service.start().await {
         Ok(()) => {
-            info!("Service stopped successfully");
-            Ok(())
+            info!("✅ Service stopped gracefully");
         }
         Err(e) => {
-            error!("Service stopped with error: {}", e);
-            Err(Box::new(e))
+            error!("❌ Service error: {}", e);
+            std::process::exit(1);
         }
     }
+
+    info!("✅ Application stopped gracefully");
+    Ok(())
 }
 
-/// Real-time mode entry
+async fn run_live_application_with_service(
+    settings: Settings,
+    repository: Arc<TickDataRepository>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Create exchange
+    info!("📡 Initializing exchange connection...");
+    info!("🔌 Exchange provider: {}", settings.exchange.provider);
+    let exchange = create_exchange(&settings.exchange.provider)
+        .map_err(|e| format!("Failed to create exchange: {}", e))?;
+    info!("✅ Exchange connection ready");
+
+    // Create market data service
+    let service = MarketDataService::new(exchange, repository, settings.symbols.clone());
+
+    info!(
+        "🎯 Starting market data collection for {} symbols",
+        settings.symbols.len()
+    );
+
+    // Setup signal forwarding to service
+    let service_shutdown_tx = service.get_shutdown_tx();
+    tokio::spawn(async move {
+        signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
+        println!("\nReceived Ctrl+C signal, forwarding to service...");
+        info!("Received Ctrl+C signal, forwarding to service");
+        let _ = service_shutdown_tx.send(());
+    });
+
+    // Start service and wait for completion
+    match service.start().await {
+        Ok(()) => {
+            info!("✅ Service stopped gracefully");
+        }
+        Err(e) => {
+            error!("❌ Service error: {}", e);
+            std::process::exit(1);
+        }
+    }
+
+    info!("✅ Application stopped gracefully");
+    Ok(())
+}
+
 async fn run_live_mode() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize environment and logging
+    // Initialize application environment
     init_application().await?;
 
-    info!("🚀 Starting Trading Core Application (Live Mode)");
+    info!("🔬 Starting Trading Core Application (Live Mode)");
 
     // Load configuration
     let settings = Settings::new()?;
-
     info!("📋 Configuration loaded successfully");
     info!("📊 Monitoring symbols: {:?}", settings.symbols);
     info!(
@@ -212,11 +297,7 @@ async fn run_live_mode() -> Result<(), Box<dyn std::error::Error>> {
         settings.cache.redis.ttl_seconds
     );
 
-    // Create and start the application
-    run_live_application(settings).await?;
-
-    info!("✅ Application stopped gracefully");
-    Ok(())
+    run_live_application(settings).await
 }
 
 /// Backtesting mode entry
@@ -264,314 +345,316 @@ async fn run_backtest_interactive(
     let data_info = repository.get_backtest_data_info().await?;
 
     println!("\n📈 Available Data:");
-    println!("  Total Records: {}", data_info.total_records);
-    println!("  Available Symbols: {}", data_info.symbols_count);
-
+    println!("   Total Records: {}", data_info.total_records);
+    println!("   Symbols: {}", data_info.symbols_count);
     if let Some(earliest) = data_info.earliest_time {
-        println!(
-            "  Earliest Data: {}",
-            earliest.format("%Y-%m-%d %H:%M:%S UTC")
-        );
+        println!("   Earliest: {}", earliest.format("%Y-%m-%d %H:%M:%S UTC"));
     }
     if let Some(latest) = data_info.latest_time {
-        println!("  Latest Data: {}", latest.format("%Y-%m-%d %H:%M:%S UTC"));
+        println!("   Latest: {}", latest.format("%Y-%m-%d %H:%M:%S UTC"));
     }
 
-    println!("\n📋 Symbol Details:");
-    for (i, symbol_info) in data_info.symbol_info.iter().take(10).enumerate() {
+    println!("\n📊 Available Symbols:");
+    for symbol_info in &data_info.symbol_info {
         println!(
-            "  {}: {} ({} records)",
-            i + 1,
-            symbol_info.symbol,
-            symbol_info.records_count
+            "   {}: {} records",
+            symbol_info.symbol, symbol_info.records_count
         );
     }
 
-    if data_info.symbol_info.len() > 10 {
-        println!(
-            "  ... and {} more symbols",
-            data_info.symbol_info.len() - 10
-        );
-    }
-
-    // Strategy Selection
-    println!("\n🎯 Available Strategies:");
+    // Strategy selection
+    println!("\n{}", "=".repeat(60));
+    println!("🎯 Available Strategies:");
     let strategies = list_strategies();
-    for (i, strategy) in strategies.iter().enumerate() {
-        println!("  {}) {} - {}", i + 1, strategy.name, strategy.description);
+    for (idx, strategy) in strategies.iter().enumerate() {
+        println!("   {}) {}", idx + 1, strategy.name);
+        println!("      ID: {}", strategy.id);
+        println!("      Description: {}", strategy.description);
     }
 
     print!("\nSelect strategy (1-{}): ", strategies.len());
     io::stdout().flush()?;
+    let mut strategy_input = String::new();
+    io::stdin().read_line(&mut strategy_input)?;
+    let strategy_idx: usize = strategy_input.trim().parse().map_err(|_| {
+        "Invalid strategy selection".to_string()
+    })?;
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let choice: usize = input.trim().parse().unwrap_or(0);
-
-    if choice == 0 || choice > strategies.len() {
-        println!("❌ Invalid selection");
-        return Ok(());
+    if strategy_idx < 1 || strategy_idx > strategies.len() {
+        return Err("Invalid strategy selection".into());
     }
 
-    let selected_strategy = &strategies[choice - 1];
-    println!("✅ Selected Strategy: {}", selected_strategy.name);
+    let selected_strategy = &strategies[strategy_idx - 1];
+    println!("✅ Selected: {}", selected_strategy.name);
 
-    // Trading pair selection
-    println!("\n📊 Symbol Selection:");
-    let available_symbols = data_info.get_available_symbols();
+    // Symbol selection
+    print!("\nSelect symbol: ");
+    io::stdout().flush()?;
+    let mut symbol_input = String::new();
+    io::stdin().read_line(&mut symbol_input)?;
+    let symbol = symbol_input.trim().to_uppercase();
 
-    // Display the first 10 symbols for quick selection
-    for (i, symbol) in available_symbols.iter().take(10).enumerate() {
-        let symbol_info = data_info.get_symbol_info(symbol).unwrap();
-        println!(
-            "  {}) {} ({} records)",
-            i + 1,
-            symbol,
-            symbol_info.records_count
+    // Check if symbol exists
+    let symbol_info = data_info
+        .symbol_info
+        .iter()
+        .find(|s| s.symbol == symbol)
+        .ok_or_else(|| format!("Symbol {} not found in database", symbol))?;
+
+    println!("✅ Selected: {} ({} records)", symbol, symbol_info.records_count);
+
+    // Data count
+    print!("\nEnter number of records to backtest (default: 10000): ");
+    io::stdout().flush()?;
+    let mut count_input = String::new();
+    io::stdin().read_line(&mut count_input)?;
+    let data_count: u64 = if count_input.trim().is_empty() {
+        10000
+    } else {
+        count_input.trim().parse().map_err(|_| "Invalid number")?
+    };
+
+    if data_count > symbol_info.records_count {
+        warn!(
+            "⚠️  Requested {} records, but only {} available. Using {} records.",
+            data_count, symbol_info.records_count, symbol_info.records_count
         );
     }
 
-    print!(
-        "\nSelect symbol (1-{}) or enter custom symbol: ",
-        available_symbols.len().min(10)
-    );
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    let symbol = if let Ok(choice) = input.parse::<usize>() {
-        if choice > 0 && choice <= available_symbols.len().min(10) {
-            available_symbols[choice - 1].clone()
-        } else {
-            println!("❌ Invalid selection");
-            return Ok(());
-        }
-    } else if input.is_empty() {
-        "BTCUSDT".to_string()
-    } else {
-        input.to_uppercase()
-    };
-
-    // Verify whether the selected transaction pair has data
-    if !data_info.has_sufficient_data(&symbol, 100) {
-        println!(
-            "❌ Insufficient data for symbol: {} (minimum 100 records required)",
-            symbol
-        );
-        return Ok(());
-    }
-
-    let symbol_info = data_info.get_symbol_info(&symbol).unwrap();
-    println!(
-        "✅ Selected Symbol: {} ({} records available)",
-        symbol, symbol_info.records_count
-    );
-
-    // Data quantity selection
-    print!(
-        "\nEnter number of records to backtest (default: 10000, max: {}): ",
-        symbol_info.records_count
-    );
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let data_count: i64 = if input.trim().is_empty() {
-        10000.min(symbol_info.records_count as i64)
-    } else {
-        input
-            .trim()
-            .parse()
-            .unwrap_or(10000)
-            .min(symbol_info.records_count as i64)
-    };
-
-    // Initial Funding Setup
+    // Initial capital
     print!("\nEnter initial capital (default: $10000): $");
     io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let initial_capital = if input.trim().is_empty() {
+    let mut capital_input = String::new();
+    io::stdin().read_line(&mut capital_input)?;
+    let initial_capital = if capital_input.trim().is_empty() {
         Decimal::from(10000)
     } else {
-        Decimal::from_str(input.trim()).unwrap_or(Decimal::from(10000))
+        Decimal::from_str(capital_input.trim())
+            .map_err(|_| "Invalid capital amount")?
     };
 
-    // Commission rate setting
+    // Commission rate
     print!("\nEnter commission rate % (default: 0.1%): ");
     io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let commission_rate = if input.trim().is_empty() {
-        Decimal::from_str("0.001").unwrap() // 0.1%
+    let mut commission_input = String::new();
+    io::stdin().read_line(&mut commission_input)?;
+    let commission_percent = if commission_input.trim().is_empty() {
+        Decimal::from_str("0.1").unwrap()
     } else {
-        let rate = input.trim().parse::<f64>().unwrap_or(0.1);
-        Decimal::from_str(&format!("{}", rate / 100.0))
-            .unwrap_or(Decimal::from_str("0.001").unwrap())
+        Decimal::from_str(commission_input.trim())
+            .map_err(|_| "Invalid commission rate")?
     };
+    let commission_rate = commission_percent / Decimal::from(100);
+
+    println!("\n{}", "=".repeat(60));
+    println!("🚀 Starting Backtest");
+    println!("{}", "=".repeat(60));
+    println!("Strategy: {}", selected_strategy.name);
+    println!("Symbol: {}", symbol);
+    println!("Data Points: {}", data_count);
+    println!("Initial Capital: ${}", initial_capital);
+    println!("Commission Rate: {:.4}%", commission_rate * Decimal::from(100));
+    println!("{}", "=".repeat(60));
+
+    // Create strategy
+    let mut strategy = create_strategy(&selected_strategy.id)
+        .map_err(|e| format!("Failed to create strategy: {}", e))?;
+
+    // Initialize strategy with empty params for now
+    strategy.initialize(std::collections::HashMap::new())
+        .map_err(|e| format!("Failed to initialize strategy: {}", e))?;
+
+    // Check if strategy supports OHLC (before creating engine)
+    let supports_ohlc = strategy.supports_ohlc();
+    let preferred_timeframe = strategy.preferred_timeframe();
+
+    // Create backtest config
+    let config = BacktestConfig::new(initial_capital)
+        .with_commission_rate(commission_rate);
+
+    // Create backtest engine
+    let mut engine = BacktestEngine::new(strategy, config)?;
 
     // Check if strategy supports OHLC
-    let temp_strategy = create_strategy(&selected_strategy.id)?;
-    if temp_strategy.supports_ohlc() {
-        if let Some(timeframe) = temp_strategy.preferred_timeframe() {
-            println!(
+    if supports_ohlc {
+        if let Some(timeframe) = preferred_timeframe {
+            info!(
                 "\n🔄 Strategy supports OHLC, using {} timeframe for better performance",
                 timeframe.as_str()
             );
 
-            // Estimate candle count needed (roughly data_count / 50, minimum 100)
-            let candle_count = (data_count / 50).max(100) as u32;
+            // Get OHLC data
+            let ohlc_data = repository
+                .generate_recent_ohlc_for_backtest(&symbol, timeframe, data_count as u32)
+                .await?;
 
-            println!("🔍 Loading {} OHLC candles for {}...", candle_count, symbol);
-
-            match repository
-                .generate_recent_ohlc_for_backtest(&symbol, timeframe, candle_count)
-                .await
-            {
-                Ok(ohlc_data) if !ohlc_data.is_empty() => {
-                    println!("✅ Loaded {} OHLC candles", ohlc_data.len());
-                    println!(
-                        "📅 Data range: {} to {}",
-                        ohlc_data
-                            .first()
-                            .unwrap()
-                            .timestamp
-                            .format("%Y-%m-%d %H:%M:%S"),
-                        ohlc_data
-                            .last()
-                            .unwrap()
-                            .timestamp
-                            .format("%Y-%m-%d %H:%M:%S")
-                    );
-
-                    let config =
-                        BacktestConfig::new(initial_capital).with_commission_rate(commission_rate);
-
-                    let strategy = create_strategy(&selected_strategy.id)?;
-
-                    println!("\n{}", "=".repeat(60));
-                    let mut engine = BacktestEngine::new(strategy, config)?;
-                    let result = engine.run_with_ohlc(ohlc_data);
-
-                    // Show results
-                    println!("\n");
-                    result.print_summary();
-
-                    // Ask whether to display detailed transaction analysis
-                    print!("\nShow detailed trade analysis? (y/N): ");
-                    io::stdout().flush()?;
-
-                    let mut input = String::new();
-                    io::stdin().read_line(&mut input)?;
-                    if input.trim().to_lowercase() == "y" || input.trim().to_lowercase() == "yes" {
-                        result.print_trade_analysis();
-                    }
-
-                    println!("\n🎉 Backtest completed successfully!");
-                    return Ok(());
-                }
-                Ok(_) => {
-                    println!(
-                        "⚠️ No OHLC data available for timeframe {}, falling back to tick data",
-                        timeframe.as_str()
-                    );
-                }
-                Err(e) => {
-                    println!(
-                        "⚠️ OHLC generation failed: {}, falling back to tick data",
-                        e
-                    );
-                }
+            if ohlc_data.is_empty() {
+                return Err(format!(
+                    "No OHLC data available for {} with timeframe {}",
+                    symbol,
+                    timeframe.as_str()
+                )
+                .into());
             }
+
+            info!("📊 Loaded {} OHLC candles", ohlc_data.len());
+
+            // Run backtest with OHLC
+            let result = engine.run_with_ohlc(ohlc_data);
+            display_backtest_results(&result);
+        } else {
+            // Fallback to tick data
+            let ticks = repository
+                .get_recent_ticks_for_backtest(&symbol, data_count as i64)
+                .await?;
+
+            if ticks.is_empty() {
+                return Err(format!("No data available for symbol: {}", symbol).into());
+            }
+
+            info!("📊 Loaded {} ticks", ticks.len());
+
+            // Run backtest
+            let result = engine.run(ticks);
+            display_backtest_results(&result);
         }
+    } else {
+        // Get tick data
+        let ticks = repository
+            .get_recent_ticks_for_backtest(&symbol, data_count as i64)
+            .await?;
+
+        if ticks.is_empty() {
+            return Err(format!("No data available for symbol: {}", symbol).into());
+        }
+
+        info!("📊 Loaded {} ticks", ticks.len());
+
+        // Run backtest
+        let result = engine.run(ticks);
+        display_backtest_results(&result);
     }
-
-    // Fallback to tick data (original logic)
-    println!(
-        "\n🔍 Loading historical tick data: {} latest {} records...",
-        symbol, data_count
-    );
-
-    let data = repository
-        .get_recent_ticks_for_backtest(&symbol, data_count)
-        .await?;
-
-    if data.is_empty() {
-        println!("❌ No historical data found for symbol: {}", symbol);
-        return Ok(());
-    }
-
-    println!("✅ Loaded {} tick data points", data.len());
-    println!(
-        "📅 Data range: {} to {}",
-        data.first().unwrap().timestamp.format("%Y-%m-%d %H:%M:%S"),
-        data.last().unwrap().timestamp.format("%Y-%m-%d %H:%M:%S")
-    );
-
-    let config = BacktestConfig::new(initial_capital).with_commission_rate(commission_rate);
-
-    let strategy = create_strategy(&selected_strategy.id)?;
-
-    println!("\n{}", "=".repeat(60));
-    let mut engine = BacktestEngine::new(strategy, config)?;
-    let result = engine.run(data);
-
-    // Show results
-    println!("\n");
-    result.print_summary();
-
-    // Ask whether to display detailed transaction analysis
-    print!("\nShow detailed trade analysis? (y/N): ");
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    if input.trim().to_lowercase() == "y" || input.trim().to_lowercase() == "yes" {
-        result.print_trade_analysis();
-    }
-
-    println!("\n🎉 Backtest completed successfully!");
 
     Ok(())
 }
 
-/// Initialize application environment and logging
-async fn init_application() -> Result<(), Box<dyn std::error::Error>> {
-    // Load environment variables from .env file
-    dotenv::dotenv().ok();
+fn display_backtest_results(result: &crate::backtest::engine::BacktestResult) {
+    println!("\n{}", "=".repeat(60));
+    println!("📊 BACKTEST RESULTS SUMMARY");
+    println!("{}", "=".repeat(60));
+    println!("Strategy: {}", result.strategy_name);
+    println!("Initial Capital: ${:.2}", result.initial_capital);
+    println!("Final Value: ${:.2}", result.final_value);
+    println!("Total P&L: ${:.2}", result.total_pnl);
+    println!("Return: {:.2}%", result.return_percentage);
 
-    // Initialize tracing/logging
-    init_tracing()?;
+    println!("\n{}", "-".repeat(60));
+    println!("TRADING STATISTICS");
+    println!("{}", "-".repeat(60));
+    println!("Total Trades: {}", result.total_trades);
+    println!(
+        "Winning Trades: {} ({:.1}%)",
+        result.winning_trades,
+        if result.total_trades > 0 {
+            (result.winning_trades as f64 / result.total_trades as f64) * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!(
+        "Losing Trades: {} ({:.1}%)",
+        result.losing_trades,
+        if result.total_trades > 0 {
+            (result.losing_trades as f64 / result.total_trades as f64) * 100.0
+        } else {
+            0.0
+        }
+    );
+    println!("Profit Factor: {:.2}", result.profit_factor);
+
+    println!("\n{}", "-".repeat(60));
+    println!("RISK METRICS");
+    println!("{}", "-".repeat(60));
+    println!("Max Drawdown: {:.2}%", result.max_drawdown);
+    println!("Sharpe Ratio: {:.2}", result.sharpe_ratio);
+    println!("Volatility: {:.2}%", result.volatility);
+}
+
+// Helper functions
+async fn init_application() -> Result<(), Box<dyn std::error::Error>> {
+    // Load environment variables
+    if dotenv::dotenv().is_err() {
+        warn!("⚠️  No .env file found, using environment variables");
+    }
+
+    // Initialize tracing
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("trading_core=info"));
+
+    tracing_subscriber::registry()
+        .with(fmt::layer().with_target(false))
+        .with(filter)
+        .init();
 
     info!("🔧 Application environment initialized");
     Ok(())
 }
 
-/// Initialize tracing subscriber for logging
-fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
-    // Create env filter from RUST_LOG environment variable
-    // Default to info level if not set
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("trading_core=info,sqlx=info,tokio=info,hyper=info"));
+async fn create_database_pool(settings: &Settings) -> Result<PgPool, Box<dyn std::error::Error>> {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| settings.database.url.clone());
 
-    // Setup tracing subscriber with structured logging
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(
-            fmt::layer()
-                .with_target(true)
-                .with_thread_ids(true)
-                .with_file(true)
-                .with_line_number(true)
-                .compact(),
-        )
-        .init();
+    let pool = sqlx::PgPool::connect_with(
+        sqlx::postgres::PgConnectOptions::from_str(&database_url)?
+    )
+    .await?;
 
+    Ok(pool)
+}
+
+async fn test_database_connection(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
+    sqlx::query("SELECT 1")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Database connection test failed: {}", e))?;
     Ok(())
+}
+
+async fn create_cache(settings: &Settings) -> Result<data::cache::TieredCache, Box<dyn std::error::Error>> {
+    use data::cache::TieredCache;
+
+    let redis_url = std::env::var("REDIS_URL")
+        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+
+    match TieredCache::new(
+        (settings.cache.memory.max_ticks_per_symbol, settings.cache.memory.ttl_seconds),
+        (&redis_url, settings.cache.redis.max_ticks_per_symbol, settings.cache.redis.ttl_seconds),
+    ).await {
+        Ok(cache) => {
+            info!("✅ Using tiered cache (Memory + Redis)");
+            Ok(cache)
+        }
+        Err(e) => {
+            warn!("⚠️  Redis unavailable ({}), but continuing with memory cache", e);
+            // Try to create with minimal Redis config
+            TieredCache::new(
+                (settings.cache.memory.max_ticks_per_symbol, settings.cache.memory.ttl_seconds),
+                ("redis://127.0.0.1:6379", 0, 0),
+            ).await.map_err(|e| format!("Failed to create cache: {}", e).into())
+        }
+    }
+}
+
+async fn create_backtest_cache(settings: &Settings) -> Result<data::cache::TieredCache, Box<dyn std::error::Error>> {
+    // For backtesting, we can use a simpler cache configuration
+    use data::cache::TieredCache;
+
+    let cache = TieredCache::new(
+        (settings.cache.memory.max_ticks_per_symbol, settings.cache.memory.ttl_seconds),
+        ("", 0, 0), // No Redis for backtesting
+    ).await.map_err(|_| "Failed to create backtest cache")?;
+
+    Ok(cache)
 }
 
 /// Main application runtime (original live mode)
@@ -605,7 +688,9 @@ async fn run_live_application(settings: Settings) -> Result<(), Box<dyn std::err
 
     // Create exchange
     info!("📡 Initializing exchange connection...");
-    let exchange = Arc::new(BinanceExchange::new());
+    info!("🔌 Exchange provider: {}", settings.exchange.provider);
+    let exchange = create_exchange(&settings.exchange.provider)
+        .map_err(|e| format!("Failed to create exchange: {}", e))?;
     info!("✅ Exchange connection ready");
 
     // Create market data service
@@ -628,99 +713,14 @@ async fn run_live_application(settings: Settings) -> Result<(), Box<dyn std::err
     // Start service and wait for completion
     match service.start().await {
         Ok(()) => {
-            info!("✅ Service stopped successfully");
-            Ok(())
+            info!("✅ Service stopped gracefully");
         }
         Err(e) => {
-            error!("❌ Service stopped with error: {}", e);
-            Err(Box::new(e))
+            error!("❌ Service error: {}", e);
+            std::process::exit(1);
         }
     }
-}
 
-/// Create database connection pool
-async fn create_database_pool(settings: &Settings) -> Result<PgPool, Box<dyn std::error::Error>> {
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(settings.database.max_connections)
-        .min_connections(settings.database.min_connections)
-        .max_lifetime(Duration::from_secs(settings.database.max_lifetime))
-        .acquire_timeout(Duration::from_secs(30))
-        .idle_timeout(Duration::from_secs(600))
-        .connect(&settings.database.url)
-        .await?;
-
-    Ok(pool)
-}
-
-/// Test database connection
-async fn test_database_connection(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
-    // Simple connectivity test
-    sqlx::query("SELECT 1").execute(pool).await?;
-
-    // Check if tick_data table exists
-    let table_exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name = 'tick_data'
-        )",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !table_exists {
-        error!("❌ Required table 'tick_data' does not exist in database");
-        error!("💡 Please run the database migration scripts first");
-        std::process::exit(1);
-    }
-
-    info!("✅ Database schema validation passed");
-    Ok(())
-}
-
-/// Create cache instance (original live mode)
-async fn create_cache(settings: &Settings) -> Result<TieredCache, Box<dyn std::error::Error>> {
-    let memory_config = (
-        settings.cache.memory.max_ticks_per_symbol,
-        settings.cache.memory.ttl_seconds,
-    );
-
-    let redis_config = (
-        settings.cache.redis.url.as_str(),
-        settings.cache.redis.max_ticks_per_symbol,
-        settings.cache.redis.ttl_seconds,
-    );
-
-    let cache = TieredCache::new(memory_config, redis_config).await?;
-
-    // Test cache connectivity
-    test_cache_connection(&cache).await?;
-
-    Ok(cache)
-}
-
-/// Create simplified cache for backtest mode
-async fn create_backtest_cache(
-    settings: &Settings,
-) -> Result<TieredCache, Box<dyn std::error::Error>> {
-    // Creating a minimal cache configuration for backtesting
-    let memory_config = (10, 60);
-    let redis_config = (settings.cache.redis.url.as_str(), 10, 60);
-
-    let cache = TieredCache::new(memory_config, redis_config).await?;
-
-    // Simple connection test (not required to be completely normal, because backtesting mainly uses the database)
-    if let Err(e) = test_cache_connection(&cache).await {
-        warn!("⚠️ Cache test failed (this is OK for backtest mode): {}", e);
-    }
-
-    Ok(cache)
-}
-
-/// Test cache connection
-async fn test_cache_connection(cache: &TieredCache) -> Result<(), Box<dyn std::error::Error>> {
-    // Test cache by getting symbols (should return empty list initially)
-    cache.get_symbols().await?;
-    info!("✅ Cache connectivity test passed");
+    info!("✅ Application stopped gracefully");
     Ok(())
 }

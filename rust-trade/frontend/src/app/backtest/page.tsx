@@ -1,18 +1,49 @@
 // src/app/backtest/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Loader2, Database, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
-import { 
-  DataInfoResponse, 
-  StrategyInfo, 
-  BacktestRequest, 
+import {
+  BacktestRequest,
   BacktestResponse,
-  HistoricalDataRequest 
+  DataInfoResponse,
+  StrategyInfo
 } from '@/types/backtest';
+import { AlertCircle, CheckCircle, Database, Loader2, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+// Check if Tauri is available (only in Tauri desktop app)
+const isTauriAvailable = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+// API base URL - defaults to localhost:8080 (Rust backend)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
+async function invokeTauri(command: string, args?: any): Promise<any> {
+  if (!isTauriAvailable) {
+    throw new Error('Tauri API not available. Please use the desktop application.');
+  }
+  
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke(command, args);
+}
+
+// HTTP API client for browser mode
+async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
 
 interface BacktestParams {
   strategy_id: string;
@@ -65,10 +96,39 @@ export default function BacktestPage() {
       setLoading(true);
       setError(null);
 
-      // Load data info and strategies in parallel
+      // Try HTTP API first (for browser mode), fallback to Tauri
+      if (!isTauriAvailable) {
+        // Use HTTP API
+        console.log('Tauri not available, using HTTP API:', API_BASE_URL);
+        
+        try {
+          const [dataInfoResult, strategiesResult] = await Promise.all([
+            fetchAPI<DataInfoResponse>('/api/data/info'),
+            fetchAPI<StrategyInfo[]>('/api/strategies')
+          ]);
+
+          setDataInfo(dataInfoResult);
+          setStrategies(strategiesResult);
+
+          // Set default values
+          if (strategiesResult.length > 0) {
+            setParams(prev => ({ ...prev, strategy_id: strategiesResult[0].id }));
+          }
+          if (dataInfoResult.symbol_info.length > 0) {
+            setParams(prev => ({ ...prev, symbol: dataInfoResult.symbol_info[0].symbol }));
+          }
+        } catch (err) {
+          console.error('Failed to load data from HTTP API:', err);
+          setError(`Failed to connect to API server at ${API_BASE_URL}. Please ensure the backend is running: cargo run api`);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Load data info and strategies in parallel (Tauri mode)
       const [dataInfoResult, strategiesResult] = await Promise.all([
-        invoke<DataInfoResponse>('get_data_info'),
-        invoke<StrategyInfo[]>('get_available_strategies')
+        invokeTauri<DataInfoResponse>('get_data_info'),
+        invokeTauri<StrategyInfo[]>('get_available_strategies')
       ]);
 
       setDataInfo(dataInfoResult);
@@ -92,7 +152,22 @@ export default function BacktestPage() {
 
   const validateConfiguration = async () => {
     try {
-      const isValid = await invoke<boolean>('validate_backtest_config', {
+      if (!isTauriAvailable) {
+        // Use HTTP API
+        try {
+          const isValid = await fetchAPI<boolean>(
+            `/api/backtest/validate?symbol=${encodeURIComponent(params.symbol)}&data_count=${params.data_count}`
+          );
+          setConfigValid(isValid);
+        } catch (err) {
+          console.error('Validation failed:', err);
+          // Fallback: just check if basic params are set
+          setConfigValid(params.symbol.length > 0 && params.data_count > 0);
+        }
+        return;
+      }
+
+      const isValid = await invokeTauri<boolean>('validate_backtest_config', {
         symbol: params.symbol,
         dataCount: params.data_count
       });
@@ -104,6 +179,11 @@ export default function BacktestPage() {
   };
 
   const runBacktest = async () => {
+    if (!isTauriAvailable) {
+      setError('⚠️ Running backtests via HTTP API is not yet implemented. Please use the desktop application (npx tauri dev) or run backtests via CLI (cargo run backtest)');
+      return;
+    }
+
     if (!configValid) {
       setError('Configuration is not valid');
       return;
@@ -127,7 +207,7 @@ export default function BacktestPage() {
       };
 
       console.log('Running backtest with request:', request);
-      const response = await invoke<BacktestResponse>('run_backtest', { request });
+      const response = await invokeTauri<BacktestResponse>('run_backtest', { request });
       console.log('Backtest completed:', response);
       setResult(response);
 
@@ -381,6 +461,22 @@ export default function BacktestPage() {
           </button>
         </CardContent>
       </Card>
+
+      {/* Info/Warning Display */}
+      {!isTauriAvailable && (
+        <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+              <AlertCircle className="w-5 h-5" />
+              <div>
+                <span className="font-medium">Browser Mode:</span>
+                <span className="ml-2">Using HTTP API at {API_BASE_URL}. Make sure the backend is running:</span>
+                <code className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded text-sm">cd trading-core && cargo run api</code>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error Display */}
       {error && (

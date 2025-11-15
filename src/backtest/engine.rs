@@ -248,6 +248,12 @@ impl BacktestEngine {
                 self.delta_calculator.update(&next_tick, adjusted_time);
                 
                 // Эмулируем исполнение ордеров
+                // Сначала сохраняем активные ордера до обработки
+                let orders_before: Vec<(u64, bool, f64)> = self.emulator.get_active_orders()
+                    .iter()
+                    .map(|(id, o)| (*id, o.is_buy, o.price))
+                    .collect();
+                
                 #[cfg(feature = "rand")]
                 {
                     use rand::Rng;
@@ -257,6 +263,42 @@ impl BacktestEngine {
                 {
                     // Без рандома просто обрабатываем тик
                     // В реальной реализации здесь будет другой способ передачи RNG
+                }
+                
+                // Проверяем, какие buy ордера исполнились, и уведомляем стратегии
+                #[cfg(feature = "gate_exec")]
+                {
+                    let orders_after: Vec<u64> = self.emulator.get_active_orders()
+                        .keys()
+                        .copied()
+                        .collect();
+                    
+                    // Находим buy ордера, которые исполнились (были в before, но нет в after)
+                    for (id, was_buy, price) in &orders_before {
+                        if *was_buy {
+                            // Проверяем, исполнился ли ордер
+                            let still_exists = orders_after.contains(id);
+                            if !still_exists {
+                                // Ордер исполнился - уведомляем стратегии
+                                for adapter in &mut self.strategies {
+                                    if let Some(action) = adapter.on_buy_filled(*price, 100.0) {
+                                        match action {
+                                            StrategyAction::PlaceSell { price: sell_price, size } => {
+                                                let _ = self.emulator.place_limit_order(
+                                                    &next_tick.symbol,
+                                                    sell_price,
+                                                    size,
+                                                    false,
+                                                    adjusted_time,
+                                                );
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 tick_count += 1;
@@ -378,8 +420,11 @@ impl BacktestEngine {
                 match adapter.on_tick(tick, &deltas) {
                     StrategyAction::NoAction => {}
                     StrategyAction::PlaceBuy { price, size } => {
-                        let _id = self.emulator.place_limit_order(&tick.symbol, price, size, true, adjusted_time);
-                        // Можно сохранить id при необходимости
+                        let id = self.emulator.place_limit_order(&tick.symbol, price, size, true, adjusted_time);
+                        if id > 0 {
+                            println!("📊 [{}] Strategy {} placed BUY order: price={:.8}, size={:.2}, id={}", 
+                                tick.symbol, adapter.get_name(), price, size, id);
+                        }
                     }
                     StrategyAction::PlaceSell { price, size } => {
                         let _id = self.emulator.place_limit_order(&tick.symbol, price, size, false, adjusted_time);

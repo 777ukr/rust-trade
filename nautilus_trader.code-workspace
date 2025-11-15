@@ -1,0 +1,201 @@
+{
+  "folders": [
+    {
+      "name": "NautilusTrader",
+      "path": "nautilus_trader"
+    },
+    {
+      "name": "Freqtrade (Related)",
+      "path": "../freqtrade"
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "${workspaceFolder:nautilus_trader}/.venv/bin/python",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.ruffEnabled": true,
+    "python.formatting.provider": "none",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+      "tests"
+    ],
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.cargo.allFeatures": true,
+    "rust-analyzer.inlayHints.typeHints.enable": true,
+    "rust-analyzer.inlayHints.parameterHints.enable": true,
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.pyc": true,
+      "**/.pytest_cache": true,
+      "**/.mypy_cache": true,
+      "**/target": false,
+      "**/Cargo.lock": false
+    },
+    "files.watcherExclude": {
+      "**/target/**": true,
+      "**/.venv/**": true,
+      "**/__pycache__/**": true,
+      "**/.pytest_cache/**": true,
+      "**/.mypy_cache/**": true
+    },
+    "search.exclude": {
+      "**/target": true,
+      "**/.venv": true,
+      "**/__pycache__": true,
+      "**/.pytest_cache": true,
+      "**/.mypy_cache": true,
+      "**/node_modules": true
+    },
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    },
+    "[python]": {
+      "editor.defaultFormatter": "charliermarsh.ruff",
+      "editor.formatOnSave": true,
+      "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit",
+        "source.fixAll": "explicit"
+      }
+    },
+    "[rust]": {
+      "editor.defaultFormatter": "rust-lang.rust-analyzer",
+      "editor.formatOnSave": true
+    },
+    "[cython]": {
+      "editor.defaultFormatter": "ms-python.python"
+    },
+    "files.associations": {
+      "*.pxd": "cython",
+      "*.pyx": "cython"
+    },
+    "terminal.integrated.cwd": "${workspaceFolder:nautilus_trader}",
+    "terminal.integrated.env.linux": {
+      "PYTHONPATH": "${workspaceFolder:nautilus_trader}:${env:PYTHONPATH}"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "rust-lang.rust-analyzer",
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "charliermarsh.ruff",
+      "tamasfe.even-better-toml",
+      "serayuzgur.crates",
+      "vadimcn.vscode-lldb"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build (Release)",
+        "type": "shell",
+        "command": "make build",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Build (Debug)",
+        "type": "shell",
+        "command": "make build-debug",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Install",
+        "type": "shell",
+        "command": "make install",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Test (Python)",
+        "type": "shell",
+        "command": "make pytest",
+        "group": "test",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Test (Rust)",
+        "type": "shell",
+        "command": "make cargo-test",
+        "group": "test",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Lint (Ruff)",
+        "type": "shell",
+        "command": "make ruff",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Pre-commit",
+        "type": "shell",
+        "command": "make pre-commit",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated"
+        },
+        "problemMatcher": []
+      }
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Python: Current File",
+        "type": "python",
+        "request": "launch",
+        "program": "${file}",
+        "console": "integratedTerminal",
+        "justMyCode": false,
+        "env": {
+          "PYTHONPATH": "${workspaceFolder:nautilus_trader}"
+        }
+      },
+      {
+        "name": "Rust: Debug",
+        "type": "lldb",
+        "request": "launch",
+        "program": "${workspaceFolder:nautilus_trader}/target/debug/nautilus_trader",
+        "args": [],
+        "cwd": "${workspaceFolder:nautilus_trader}"
+      }
+    ]
+  }
+}
+
+
+

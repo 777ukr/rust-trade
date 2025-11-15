@@ -1,13 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
-import { Loader2, Database, TrendingUp, Activity, Zap, Clock, BarChart3, Play, Eye, Coins, Layers, Timer, Sparkles } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, BarChart3, Clock, Coins, Database, Eye, Layers, Loader2, Play, Sparkles, Timer, TrendingUp, Zap } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
+// Check if Tauri is available (only in Tauri desktop app)
+const isTauriAvailable = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+async function invokeTauri(command: string, args?: any): Promise<any> {
+  if (!isTauriAvailable) {
+    throw new Error('Tauri API not available. Please use the desktop application.');
+  }
+  
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke(command, args);
+}
 
 interface DataInfoResponse {
   total_records: number;
@@ -80,9 +91,16 @@ export default function Home() {
       setLoading(true);
       setError(null);
       
+      // Check if Tauri is available
+      if (!isTauriAvailable) {
+        setError('Tauri API not available. This web interface requires the desktop application. For web access, please set up a REST API backend.');
+        setLoading(false);
+        return;
+      }
+      
       const [dataInfoResult, capabilitiesResult] = await Promise.all([
-        invoke<DataInfoResponse>('get_data_info'),
-        invoke<StrategyCapability[]>('get_strategy_capabilities')
+        invokeTauri<DataInfoResponse>('get_data_info'),
+        invokeTauri<StrategyCapability[]>('get_strategy_capabilities')
       ]);
 
       setDataInfo(dataInfoResult);
@@ -124,7 +142,7 @@ export default function Home() {
         }
       };
       
-      const ohlcData = await invoke<OHLCPreview[]>('get_ohlc_preview', {
+      const ohlcData = await invokeTauri<OHLCPreview[]>('get_ohlc_preview', {
         request: {
           symbol: selectedSymbol,
           timeframe: selectedTimeframe,

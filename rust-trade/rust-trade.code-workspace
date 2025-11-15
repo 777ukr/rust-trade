@@ -1,0 +1,261 @@
+{
+	"folders": [
+		{
+			"name": "🦀 Rust Trade",
+			"path": ".",
+			"description": "Rust-based cryptocurrency trading system with Tauri desktop app"
+		},
+		{
+			"name": "📊 Trading Core",
+			"path": "./trading-core",
+			"description": "Core trading library (Rust)"
+		},
+		{
+			"name": "🖥️ Tauri App",
+			"path": "./src-tauri",
+			"description": "Tauri desktop application backend"
+		},
+		{
+			"name": "🎨 Frontend",
+			"path": "./frontend",
+			"description": "Next.js frontend application"
+		}
+	],
+	"settings": {
+		"rust-analyzer.checkOnSave": {
+			"command": "clippy"
+		},
+		"rust-analyzer.cargo.allFeatures": true,
+		"rust-analyzer.inlayHints.typeHints.enable": true,
+		"rust-analyzer.inlayHints.parameterHints.enable": true,
+		"rust-analyzer.inlayHints.chainingHints.enable": true,
+		"rust-analyzer.procMacro.enable": true,
+		"files.exclude": {
+			"**/node_modules": true,
+			"**/dist": true,
+			"**/.git": true,
+			"**/target": false,
+			"**/Cargo.lock": false,
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/.pytest_cache": true,
+			"**/.mypy_cache": true,
+			"**/.next": true,
+			"**/.tauri": true
+		},
+		"files.watcherExclude": {
+			"**/.git/objects/**": true,
+			"**/node_modules/**": true,
+			"**/target/**": true,
+			"**/.next/**": true,
+			"**/.tauri/**": true,
+			"**/venv/**": true,
+			"**/.venv/**": true
+		},
+		"search.exclude": {
+			"**/node_modules": true,
+			"**/target": true,
+			"**/.git": true,
+			"**/.next": true,
+			"**/.tauri": true,
+			"**/venv": true,
+			"**/.venv": true,
+			"**/__pycache__": true
+		},
+		"editor.formatOnSave": true,
+		"editor.codeActionsOnSave": {
+			"source.organizeImports": "explicit",
+			"source.fixAll": "explicit"
+		},
+		"[rust]": {
+			"editor.defaultFormatter": "rust-lang.rust-analyzer",
+			"editor.formatOnSave": true
+		},
+		"[typescript]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+			"editor.formatOnSave": true
+		},
+		"[typescriptreact]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+			"editor.formatOnSave": true
+		},
+		"[javascript]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+			"editor.formatOnSave": true
+		},
+		"[javascriptreact]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+			"editor.formatOnSave": true
+		},
+		"[json]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode"
+		},
+		"[jsonc]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode"
+		},
+		"typescript.tsdk": "${workspaceFolder}/frontend/node_modules/typescript/lib",
+		"typescript.enablePromptUseWorkspaceTsdk": true,
+		"terminal.integrated.cwd": "${workspaceFolder}",
+		"terminal.integrated.env.linux": {
+			"RUST_LOG": "debug"
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"rust-lang.rust-analyzer",
+			"tamasfe.even-better-toml",
+			"serayuzgur.crates",
+			"vadimcn.vscode-lldb",
+			"dbaeumer.vscode-eslint",
+			"esbenp.prettier-vscode",
+			"bradlc.vscode-tailwindcss",
+			"tauri-apps.tauri-vscode",
+			"ms-vscode.vscode-typescript-next"
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Cargo: Build",
+				"type": "shell",
+				"command": "cargo build",
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				},
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Build (Release)",
+				"type": "shell",
+				"command": "cargo build --release",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Test",
+				"type": "shell",
+				"command": "cargo test",
+				"group": "test",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Clippy",
+				"type": "shell",
+				"command": "cargo clippy -- -D warnings",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Tauri: Dev",
+				"type": "shell",
+				"command": "cd src-tauri && cargo tauri dev",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Tauri: Build",
+				"type": "shell",
+				"command": "cd src-tauri && cargo tauri build",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Frontend: Install",
+				"type": "shell",
+				"command": "cd frontend && npm install",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Frontend: Dev",
+				"type": "shell",
+				"command": "cd frontend && npm run dev",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Frontend: Build",
+				"type": "shell",
+				"command": "cd frontend && npm run build",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Rust: Debug",
+				"type": "lldb",
+				"request": "launch",
+				"program": "${workspaceFolder}/target/debug/rust-trade",
+				"args": [],
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"RUST_LOG": "debug"
+				}
+			},
+			{
+				"name": "Tauri: Dev",
+				"type": "node",
+				"request": "launch",
+				"name": "Tauri Dev",
+				"cwd": "${workspaceFolder}/src-tauri",
+				"runtimeExecutable": "cargo",
+				"runtimeArgs": [
+					"tauri",
+					"dev"
+				],
+				"console": "integratedTerminal"
+			}
+		]
+	}
+}
+

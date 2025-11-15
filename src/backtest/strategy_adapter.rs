@@ -15,6 +15,10 @@ pub trait StrategyAdapter {
     fn on_tick(&mut self, tick: &TradeTick, deltas: &Deltas) -> StrategyAction;
     fn get_name(&self) -> &str;
     fn reset(&mut self);
+    /// Вызывается когда buy ордер исполнился
+    fn on_buy_filled(&mut self, price: f64, size: f64) -> Option<StrategyAction>;
+    /// Вызывается когда нужно вычислить цену продажи
+    fn calculate_sell_price(&self, buy_price: f64, current_price: f64) -> Option<f64>;
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +69,20 @@ impl StrategyAdapter for MShotAdapter {
     fn reset(&mut self) {
         // TODO: Реализовать reset для MShotStrategy
     }
+    
+    fn on_buy_filled(&mut self, price: f64, size: f64) -> Option<StrategyAction> {
+        self.strategy.on_buy_filled(price, size);
+        // Вычисляем цену продажи и выставляем sell ордер
+        let sell_price = self.strategy.calculate_sell_price(price, Some(price));
+        Some(StrategyAction::PlaceSell {
+            price: sell_price,
+            size,
+        })
+    }
+    
+    fn calculate_sell_price(&self, buy_price: f64, current_price: f64) -> Option<f64> {
+        Some(self.strategy.calculate_sell_price(buy_price, Some(current_price)))
+    }
 }
 
 /// Адаптер для MStrike стратегии
@@ -113,6 +131,16 @@ impl StrategyAdapter for MStrikeAdapter {
     
     fn reset(&mut self) {
         // TODO: Реализовать reset для MStrikeStrategy
+    }
+    
+    fn on_buy_filled(&mut self, price: f64, size: f64) -> Option<StrategyAction> {
+        self.strategy.on_buy_filled(price, size);
+        None // MStrike сам управляет sell через on_tick
+    }
+    
+    fn calculate_sell_price(&self, buy_price: f64, current_price: f64) -> Option<f64> {
+        // MStrike вычисляет sell_price в manage_position
+        None
     }
 }
 
@@ -165,6 +193,16 @@ impl StrategyAdapter for HookAdapter {
     
     fn reset(&mut self) {
         // TODO: Реализовать reset для HookStrategy
+    }
+    
+    fn on_buy_filled(&mut self, price: f64, size: f64) -> Option<StrategyAction> {
+        self.strategy.on_buy_filled(price, size);
+        None // Hook сам управляет sell через on_tick
+    }
+    
+    fn calculate_sell_price(&self, buy_price: f64, current_price: f64) -> Option<f64> {
+        // Hook вычисляет sell_price в manage_position
+        None
     }
 }
 

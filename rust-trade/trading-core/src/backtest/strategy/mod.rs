@@ -1,8 +1,12 @@
 pub(crate) mod base;
+mod dip_buy;
+mod ema_btc_week;
 mod rsi;
 mod sma;
 
 pub use base::{Signal, Strategy};
+use dip_buy::DipBuyStrategy;
+use ema_btc_week::EmaBtcWeekStrategy;
 use rsi::RsiStrategy;
 use sma::SmaStrategy;
 
@@ -17,6 +21,8 @@ pub fn create_strategy(strategy_id: &str) -> Result<Box<dyn Strategy>, String> {
     match strategy_id {
         "sma" => Ok(Box::new(SmaStrategy::new())),
         "rsi" => Ok(Box::new(RsiStrategy::new())),
+        "dip_buy" => Ok(Box::new(DipBuyStrategy::new())),
+        "ema_btc_week" => Ok(Box::new(EmaBtcWeekStrategy::new())),
         _ => Err(format!("Unknown strategy: {}", strategy_id)),
     }
 }
@@ -33,6 +39,16 @@ pub fn list_strategies() -> Vec<StrategyInfo> {
             id: "rsi".to_string(),
             name: "RSI Strategy".to_string(),
             description: "Trading strategy based on Relative Strength Index (RSI)".to_string(),
+        },
+        StrategyInfo {
+            id: "dip_buy".to_string(),
+            name: "Dip Buy Strategy (Low Frequency)".to_string(),
+            description: "Low-frequency strategy: buy on 0.2% dip, sell at 0.6% profit or 0.22% stop loss".to_string(),
+        },
+        StrategyInfo {
+            id: "ema_btc_week".to_string(),
+            name: "EMA BTC Week Strategy".to_string(),
+            description: "Jesse strategy: buy on 10% drop from weekly high, 20% stop loss, 50% take profit, trailing stop 5%".to_string(),
         },
     ]
 }

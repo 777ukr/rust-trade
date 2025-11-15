@@ -39447,7 +39447,8 @@ project/
   UseTakeProfit=YES
   TakeProfit=0.3000
   StrategyPenalty=0
-##End_Strategy - чтобы мы могли гибко управлять всем ты сделаешь? зпомнил все ? 
+##End_Strategy
+ - чтобы мы могли гибко управлять всем ты сделаешь? зпомнил все ? 
 
 ---
 

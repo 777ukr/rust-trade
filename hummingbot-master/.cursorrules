@@ -1,0 +1,62 @@
+# Cursor Rules for Hummingbot
+
+## Project Context
+Hummingbot is a modular cryptocurrency trading bot framework with advanced strategy architecture.
+
+**Technology Stack**:
+- Python 3.10+
+- Modular strategy architecture (strategy_v2_base.py)
+- WebSocket for real-time data
+- Exchange connectors abstraction
+- Real-time PnL tracking
+
+## Project Goal
+Study and integrate Hummingbot's modular strategy architecture and exchange connectors into Freqtrade system.
+
+## Code Style & Best Practices
+
+### Python Conventions
+- Follow PEP 8 style guide
+- Use `snake_case` for variables, functions, and modules
+- Use `PascalCase` for classes
+- Type hints are encouraged
+
+### Hummingbot-Specific Rules
+- Study `strategy_v2_base.py` for modular architecture
+- Use exchange connector abstraction
+- Implement entry/exit filters system
+- Support strategy auto-switching (long ↔ short)
+- Real-time WebSocket price feeds
+
+### Key Components to Study
+1. **Strategy Architecture**: `hummingbot/strategy/strategy_v2_base.py`
+   - Lifecycle hooks
+   - Entry/exit filters
+   - Position sizing
+   - Risk management
+
+2. **Exchange Connectors**: `hummingbot/connector/`
+   - Unified connector interface
+   - Multiple exchange support
+   - WebSocket price feeds
+   - Order management
+
+3. **Strategy Filters**: Entry/exit conditions
+   - Technical indicators
+   - Market conditions
+   - Position adjustment (DCA)
+   - Risk management rules
+
+### Integration with Freqtrade
+- Extract modular concepts
+- Adapt to Freqtrade's IStrategy interface
+- Implement base strategy class with filters
+- Add auto-switching support
+
+## Key Principles
+1. **Modularity** - Reusable components
+2. **Abstraction** - Exchange-agnostic logic
+3. **Flexibility** - Easy strategy switching
+4. **Real-time** - WebSocket for live data
+
+

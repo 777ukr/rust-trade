@@ -1,8 +1,29 @@
 {
 	"folders": [
 		{
-			"name": "crypto_trader",
-			"path": "/home/crypto/sites/cryptotrader.com"
+			"name": "📊 Freqtrade",
+			"path": "./freqtrade",
+			"description": "Freqtrade strategy rating system - Main project"
+		},
+		{
+			"name": "🎯 Jesse Test",
+			"path": "./jesse-test",
+			"description": "Jesse trading framework testing (port 9001)"
+		},
+		{
+			"name": "🐦 Hummingbot",
+			"path": "./hummingbot-master",
+			"description": "Hummingbot modular architecture reference"
+		},
+		{
+			"name": "🐙 OctoBot",
+			"path": "./OctoBot-master",
+			"description": "OctoBot visualization reference"
+		},
+		{
+			"name": "📁 Root",
+			"path": ".",
+			"description": "Root directory with shared resources"
 		}
 	],
 	"settings": {
@@ -11,10 +32,37 @@
 			"**/dist": true,
 			"**/.git": true,
 			"**/target": true,
-			"**/Cargo.lock": false
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/.pytest_cache": true,
+			"**/.mypy_cache": true,
+			"**/venv": true,
+			"**/.venv": true
+		},
+		"search.exclude": {
+			"**/node_modules": true,
+			"**/dist": true,
+			"**/.git": true,
+			"**/target": true,
+			"**/venv": true,
+			"**/.venv": true,
+			"**/__pycache__": true
 		},
 		"rust-analyzer.checkOnSave": {
 			"command": "clippy"
+		},
+		"files.watcherExclude": {
+			"**/.git/objects/**": true,
+			"**/node_modules/**": true,
+			"**/venv/**": true,
+			"**/.venv/**": true
 		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-python.vscode-pylance",
+			"rust-lang.rust-analyzer"
+		]
 	}
 }

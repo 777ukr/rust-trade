@@ -1,0 +1,63 @@
+# Cursor Rules for OctoBot
+
+## Project Context
+OctoBot is a cryptocurrency trading bot with advanced visualization and UI components.
+
+**Technology Stack**:
+- Python 3.10+
+- Advanced chart visualization (Plotly.js, Chart.js)
+- Real-time PnL dashboard
+- Interactive candlestick charts
+- Professional UI/UX
+
+## Project Goal
+Study and integrate OctoBot's advanced chart visualization and PnL dashboard into Freqtrade rating system.
+
+## Code Style & Best Practices
+
+### Python Conventions
+- Follow PEP 8 style guide
+- Use `snake_case` for variables, functions, and modules
+- Use `PascalCase` for classes
+- Type hints are encouraged
+
+### OctoBot-Specific Rules
+- Study chart visualization components
+- Learn PnL dashboard implementation
+- Understand real-time update mechanisms
+- Study UI/UX patterns
+
+### Key Components to Study
+1. **Chart Visualization**:
+   - Interactive candlestick charts
+   - EMA/SMA overlays
+   - Entry/exit markers
+   - Stop-loss/take-profit lines
+   - Real-time updates
+
+2. **PnL Dashboard**:
+   - Real-time profit tracking
+   - Win/loss ratio
+   - Trade history
+   - Performance metrics
+   - Equity curve
+
+3. **UI/UX Patterns**:
+   - Dark/light theme
+   - Smooth animations
+   - Responsive design
+   - Professional styling
+
+### Integration with Freqtrade
+- Add chart component to rating_ui.html
+- Implement PnL overlay panel
+- Add real-time updates
+- Style matching OctoBot quality
+
+## Key Principles
+1. **Visualization** - Professional charts
+2. **Real-time** - Live updates
+3. **UX** - Smooth, intuitive interface
+4. **Performance** - Optimized rendering
+
+

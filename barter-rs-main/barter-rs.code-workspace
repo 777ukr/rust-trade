@@ -1,0 +1,282 @@
+{
+	"folders": [
+		{
+			"name": "🚀 Barter RS",
+			"path": ".",
+			"description": "Barter algorithmic trading ecosystem - Main workspace"
+		},
+		{
+			"name": "⚙️ Barter Core",
+			"path": "./barter",
+			"description": "Algorithmic trading Engine with state management"
+		},
+		{
+			"name": "📊 Barter Data",
+			"path": "./barter-data",
+			"description": "Stream public market data from financial venues"
+		},
+		{
+			"name": "💼 Barter Execution",
+			"path": "./barter-execution",
+			"description": "Stream account data and execute orders"
+		},
+		{
+			"name": "🔧 Barter Instrument",
+			"path": "./barter-instrument",
+			"description": "Exchange, Instrument and Asset data structures"
+		},
+		{
+			"name": "🔌 Barter Integration",
+			"path": "./barter-integration",
+			"description": "Low-level REST/WebSocket integration frameworks"
+		},
+		{
+			"name": "🔨 Barter Macro",
+			"path": "./barter-macro",
+			"description": "Macro utilities for Barter ecosystem"
+		}
+	],
+	"settings": {
+		"rust-analyzer.checkOnSave": {
+			"command": "clippy"
+		},
+		"rust-analyzer.cargo.allFeatures": true,
+		"rust-analyzer.cargo.features": "all",
+		"rust-analyzer.inlayHints.typeHints.enable": true,
+		"rust-analyzer.inlayHints.parameterHints.enable": true,
+		"rust-analyzer.inlayHints.chainingHints.enable": true,
+		"rust-analyzer.procMacro.enable": true,
+		"rust-analyzer.workspace.symbol.search.scope": "workspace",
+		"files.exclude": {
+			"**/node_modules": true,
+			"**/dist": true,
+			"**/.git": true,
+			"**/target": false,
+			"**/Cargo.lock": false,
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/.pytest_cache": true,
+			"**/.mypy_cache": true
+		},
+		"files.watcherExclude": {
+			"**/.git/objects/**": true,
+			"**/node_modules/**": true,
+			"**/target/**": true,
+			"**/venv/**": true,
+			"**/.venv/**": true
+		},
+		"search.exclude": {
+			"**/node_modules": true,
+			"**/target": true,
+			"**/.git": true,
+			"**/venv": true,
+			"**/.venv": true,
+			"**/__pycache__": true
+		},
+		"editor.formatOnSave": true,
+		"editor.codeActionsOnSave": {
+			"source.organizeImports": "explicit",
+			"source.fixAll": "explicit"
+		},
+		"[rust]": {
+			"editor.defaultFormatter": "rust-lang.rust-analyzer",
+			"editor.formatOnSave": true,
+			"editor.rulers": [
+				100
+			]
+		},
+		"[toml]": {
+			"editor.defaultFormatter": "tamasfe.even-better-toml",
+			"editor.formatOnSave": true
+		},
+		"terminal.integrated.cwd": "${workspaceFolder}",
+		"terminal.integrated.env.linux": {
+			"RUST_LOG": "debug",
+			"RUST_BACKTRACE": "1"
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"rust-lang.rust-analyzer",
+			"tamasfe.even-better-toml",
+			"serayuzgur.crates",
+			"vadimcn.vscode-lldb",
+			"usernamehw.errorlens",
+			"dustypomerleau.rust-syntax"
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Cargo: Build (All)",
+				"type": "shell",
+				"command": "cargo build",
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				},
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Build (Release)",
+				"type": "shell",
+				"command": "cargo build --release",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Test (All)",
+				"type": "shell",
+				"command": "cargo test --workspace",
+				"group": "test",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Test (Current Package)",
+				"type": "shell",
+				"command": "cargo test",
+				"group": "test",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Clippy (All)",
+				"type": "shell",
+				"command": "cargo clippy --workspace -- -D warnings",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Format",
+				"type": "shell",
+				"command": "cargo fmt --all",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Cargo: Check (All)",
+				"type": "shell",
+				"command": "cargo check --workspace",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": [
+					"$rustc"
+				]
+			},
+			{
+				"label": "Cargo: Doc (All)",
+				"type": "shell",
+				"command": "cargo doc --workspace --no-deps --open",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Cargo: Bench",
+				"type": "shell",
+				"command": "cargo bench",
+				"group": "test",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Cargo: Clean",
+				"type": "shell",
+				"command": "cargo clean",
+				"group": "build",
+				"presentation": {
+					"reveal": "always",
+					"panel": "dedicated"
+				},
+				"problemMatcher": []
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Rust: Debug (Current)",
+				"type": "lldb",
+				"request": "launch",
+				"program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
+				"args": [],
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"RUST_LOG": "debug",
+					"RUST_BACKTRACE": "1"
+				}
+			},
+			{
+				"name": "Rust: Debug (Barter)",
+				"type": "lldb",
+				"request": "launch",
+				"program": "${workspaceFolder}/target/debug/barter",
+				"args": [],
+				"cwd": "${workspaceFolder}/barter",
+				"env": {
+					"RUST_LOG": "debug",
+					"RUST_BACKTRACE": "1"
+				}
+			},
+			{
+				"name": "Rust: Test (Current)",
+				"type": "lldb",
+				"request": "launch",
+				"program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
+				"args": [
+					"--test"
+				],
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"RUST_LOG": "debug",
+					"RUST_BACKTRACE": "1"
+				}
+			}
+		]
+	}
+}
+
